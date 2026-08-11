@@ -67,7 +67,7 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     row.querySelector<HTMLElement>(".q-pct")!.textContent = `${Math.round(q.pct)}%`;
   };
 
-  const finish = (q: QueueItem, inSize: number, outSize: number, outPath: string): void => {
+  const finish = (q: QueueItem, inSize: number, outSize: number, outPath: string, url: string): void => {
     q.pct = 100;
     q.done = true;
     done += 1;
@@ -76,11 +76,9 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     q.sizeAfter = formatBytes(outSize);
     q.dims = "读取中…";
     q.outputPath = outPath;
-    // 路径完全由模板生成（默认模板含 {YYYYMMDD}-{HHmmss}-{seq} 保证唯一，同秒多图靠序号兜底）
+    // 路径已在 processNext 中按模板生成（默认含 {YYYYMMDD}-{HHmmss}-{seq}）
     const { base } = splitName(q.name);
     const newName = base + ".webp";
-    const path = buildPath(base, "webp", undefined, ++seq);
-    q.path = path;
     const outUrl = convertFileSrc(outPath);
     readDimsAsync(outUrl).then((dims) => {
       q.dims = dims;
@@ -91,7 +89,8 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
         dims,
         date: nowDate(),
         objectURL: outUrl,
-        path,
+        url,
+        path: q.path ?? "",
       });
     });
     renderQueue();
@@ -115,16 +114,32 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
         quality: getSettings().quality,
       })
         .then(([inSize, outSize, outPath]) => {
-          running -= 1;
-          finish(q, inSize, outSize, outPath);
-          processNext();
+          q.status = "正在上传";
+          q.pct = 80;
+          updateRow(q);
+          // 生成 R2 key（模板）并上传到 Worker → R2
+          const { base } = splitName(q.name);
+          const path = buildPath(base, "webp", undefined, ++seq);
+          q.path = path;
+          const s = getSettings();
+          return invoke<{ key: string; url: string }>("upload_image", {
+            server: s.server,
+            apiKey: s.apiKey,
+            key: path,
+            content_type: "image/webp",
+            file_path: outPath,
+          }).then((res) => {
+            running -= 1;
+            finish(q, inSize, outSize, outPath, res.url);
+            processNext();
+          });
         })
         .catch((e) => {
           running -= 1;
           q.failed = true;
-          q.status = "转换失败";
+          q.status = "处理失败";
           q.pct = 100;
-          showToast(`转换失败：${String(e)}`);
+          showToast(`上传失败：${String(e)}`);
           renderQueue();
           processNext();
         });

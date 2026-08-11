@@ -17,6 +17,21 @@ export function renderSettingsView(container: HTMLElement): void {
     <div class="flex flex-col gap-4">
 
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
+        <h2 class="text-[15px] font-bold mb-1">Cloudflare Worker</h2>
+        <p class="text-xs text-ink3 leading-relaxed mb-4.5">上传图片通过 Worker 网关写入 R2，保存后生效。</p>
+        <div class="mb-3.5">
+          <label for="setServer" class="block text-[13px] font-medium mb-1.5">Worker 地址</label>
+          <input id="setServer" spellcheck="false" autocomplete="off" class="${INPUT_CLS}">
+          <p class="${HINT_CLS}">例如 <code class="${CODE_CLS}">https://your-worker.workers.dev</code>，结尾无需斜杠。</p>
+        </div>
+        <div>
+          <label for="setApiKey" class="block text-[13px] font-medium mb-1.5">API Key</label>
+          <input id="setApiKey" spellcheck="false" autocomplete="off" class="${INPUT_CLS}">
+          <p class="${HINT_CLS}">与 Worker 环境变量 <code class="${CODE_CLS}">API_KEY</code> 的值一致。</p>
+        </div>
+      </section>
+
+      <section class="bg-surface border border-line rounded-xl shadow-card p-5">
         <h2 class="text-[15px] font-bold mb-1">链接域名</h2>
         <p class="text-xs text-ink3 leading-relaxed mb-4.5">上传完成后生成的链接使用此域名，保存后立即生效。</p>
         <div>
@@ -60,12 +75,16 @@ export function renderSettingsView(container: HTMLElement): void {
   </div>`;
 
   const $ = <T extends HTMLElement>(sel: string): T => container.querySelector(sel) as T;
+  const setServer = $<HTMLInputElement>("#setServer");
+  const setApiKey = $<HTMLInputElement>("#setApiKey");
   const setDomain = $<HTMLInputElement>("#setDomain");
   const setPath = $<HTMLInputElement>("#setPath");
   const pathPreview = $<HTMLElement>("#pathPreview");
   const saveBtn = $<HTMLButtonElement>("#saveSettings");
   const resetBtn = $<HTMLButtonElement>("#resetSettings");
 
+  setServer.value = cur.server;
+  setApiKey.value = cur.apiKey;
   setDomain.value = cur.domain;
   setPath.value = cur.pathTemplate;
 
@@ -102,6 +121,8 @@ export function renderSettingsView(container: HTMLElement): void {
   saveBtn.addEventListener("click", () => {
     saveSettings({
       ...getSettings(), // 保留 copyFormat 等未在表单中的字段
+      server: setServer.value.trim(),
+      apiKey: setApiKey.value.trim(),
       domain: setDomain.value.trim() || SETTINGS_DEFAULTS.domain,
       pathTemplate: setPath.value.trim() || SETTINGS_DEFAULTS.pathTemplate,
       quality,
@@ -111,6 +132,8 @@ export function renderSettingsView(container: HTMLElement): void {
   });
   resetBtn.addEventListener("click", () => {
     saveSettings({ ...SETTINGS_DEFAULTS });
+    setServer.value = SETTINGS_DEFAULTS.server;
+    setApiKey.value = SETTINGS_DEFAULTS.apiKey;
     setDomain.value = SETTINGS_DEFAULTS.domain;
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     quality = SETTINGS_DEFAULTS.quality;

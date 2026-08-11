@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use crate::config;
 use crate::error::AppError;
 use crate::services::compress;
+use crate::services::upload;
 
 /// 读取应用配置（连接 Worker 所需的 server / apiKey 等），设置页初始化时调用
 #[tauri::command]
@@ -22,4 +23,17 @@ pub async fn convert_to_webp(input: String, quality: Option<f32>) -> Result<(u64
     })
     .await
     .map_err(|e| AppError::Io(format!("转换任务失败: {e}")))?
+}
+
+/// 将本地文件上传到 Worker → R2（API.md：PUT /objects/{key}）。
+/// 返回 Worker 给的完整访问 URL；异步执行，不阻塞主线程。
+#[tauri::command]
+pub async fn upload_image(
+    server: String,
+    api_key: String,
+    key: String,
+    content_type: String,
+    file_path: String,
+) -> Result<upload::UploadedInfo, AppError> {
+    upload::upload_file(&server, &api_key, &key, &content_type, &PathBuf::from(file_path)).await
 }

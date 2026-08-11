@@ -81,9 +81,10 @@ export const copyText = async (t: string): Promise<boolean> => {
   }
 };
 
-/** 按设置的链接格式生成复制内容：纯 URL 或 Markdown 图片语法 */
-export const formatContent = (it: { path: string; name: string }): string => {
-  const url = `${getSettings().domain}/${it.path}`;
+/** 按设置的链接格式生成复制内容：纯 URL 或 Markdown 图片语法。
+ * 优先用上传返回的完整 URL，未上传（mock）时回退 domain+path 拼接 */
+export const formatContent = (it: { path: string; name: string; url?: string }): string => {
+  const url = it.url || `${getSettings().domain}/${it.path}`;
   return getSettings().copyFormat === "markdown" ? `![${it.name}](${url})` : url;
 };
 

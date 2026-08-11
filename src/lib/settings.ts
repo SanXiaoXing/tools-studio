@@ -2,6 +2,8 @@ import type { Settings } from "./types";
 
 /** 默认设置（DESIGN-SPEC §1 / DESIGN.md §5.3） */
 export const SETTINGS_DEFAULTS: Settings = {
+  server: "",
+  apiKey: "",
   domain: "https://cdn.assets-studio.dev",
   pathTemplate: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
   copyFormat: "url",

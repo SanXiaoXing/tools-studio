@@ -9,11 +9,17 @@ export interface ImageItem {
   date: string;
   seed?: string;
   path: string;
+  /** 完整访问 URL（Worker 上传后返回，优先于 domain+path 拼接） */
+  url?: string;
   objectURL?: string;
 }
 
 /** 设置（DESIGN.md §5.3），持久化于 localStorage("as-settings") */
 export interface Settings {
+  /** Worker API 地址，如 https://your-worker.workers.dev */
+  server: string;
+  /** API Key，与 Worker 环境变量 API_KEY 一致 */
+  apiKey: string;
   domain: string;
   pathTemplate: string;
   /** 复制链接的格式：纯 URL 或 Markdown 图片语法 */
