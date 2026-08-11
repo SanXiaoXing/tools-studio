@@ -1,12 +1,14 @@
-import { SETTINGS_DEFAULTS, fillTemplate, getSettings, saveSettings } from "../lib/settings";
-import { showToast } from "../lib/utils";
+import { createRoot } from "react-dom/client";
+import { SETTINGS_DEFAULTS, fillTemplate, getSettings, saveSettings } from "../../lib/settings";
+import { showToast } from "../../lib/utils";
+import ElasticSlider from "./ElasticSlider";
 
 const INPUT_CLS =
   "w-full px-3 py-2.5 rounded-lg border border-line bg-surface2 text-ink text-[13px] outline-none focus:border-accent transition-colors";
 const HINT_CLS = "text-xs text-ink3 mt-1.5 leading-relaxed";
 const CODE_CLS = "font-mono text-[11px] bg-surface3 border border-line rounded px-1.5 py-0.5 text-ink2";
 
-/** 设置视图（DESIGN-SPEC §3.4）：域名 / 路径模板 / 正则重命名，实时预览 */
+/** 设置视图（DESIGN-SPEC §3.4）：域名 / 路径模板 / 正则重命名 / 压缩质量，实时预览 */
 export function renderSettingsView(container: HTMLElement): void {
   const cur = getSettings();
   container.innerHTML = `
@@ -63,6 +65,12 @@ export function renderSettingsView(container: HTMLElement): void {
         </div>
       </section>
 
+      <section class="bg-surface border border-line rounded-xl shadow-card p-5">
+        <h2 class="text-[15px] font-bold mb-1">压缩质量</h2>
+        <p class="text-xs text-ink3 leading-relaxed mb-4.5">上传时转为 WebP 的压缩率，越低体积越小。保存后对新上传生效。</p>
+        <div id="qualityMount"></div>
+      </section>
+
     </div>
     <div class="flex items-center gap-2.5 py-0.5 pb-2">
       <button id="saveSettings" class="inline-flex items-center gap-2 rounded-lg px-4.5 py-2.5 bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition" type="button">保存设置</button>
@@ -85,6 +93,27 @@ export function renderSettingsView(container: HTMLElement): void {
   setPath.value = cur.pathTemplate;
   setFind.value = cur.renameFind;
   setReplace.value = cur.renameReplace;
+
+  /** 弹性滑块的当前值（未保存也实时），保存后写入设置模型 */
+  let quality = cur.quality;
+  const qualityRoot = createRoot($("#qualityMount"));
+  const renderQuality = (): void => {
+    qualityRoot.render(
+      <ElasticSlider
+        defaultValue={quality}
+        startingValue={1}
+        maxValue={100}
+        isStepped
+        stepSize={1}
+        leftIcon={<>−</>}
+        rightIcon={<>+</>}
+        onChange={(v) => {
+          quality = v;
+        }}
+      />,
+    );
+  };
+  renderQuality();
 
   /** 预览基于输入框当前值（未保存也实时），保存后写入设置模型 */
   const updatePreview = (): void => {
@@ -113,6 +142,7 @@ export function renderSettingsView(container: HTMLElement): void {
       pathTemplate: setPath.value.trim() || SETTINGS_DEFAULTS.pathTemplate,
       renameFind: setFind.value,
       renameReplace: setReplace.value,
+      quality,
     });
     showToast("设置已保存");
     updatePreview();
@@ -123,6 +153,8 @@ export function renderSettingsView(container: HTMLElement): void {
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     setFind.value = "";
     setReplace.value = "";
+    quality = SETTINGS_DEFAULTS.quality;
+    renderQuality();
     updatePreview();
     showToast("已恢复默认设置");
   });

@@ -1,8 +1,8 @@
-import { renderSidebar } from "./views/sidebar";
-import { renderGallery, renderSkeleton } from "./views/gallery";
-import { renderUploadView } from "./views/upload";
-import { renderSettingsView } from "./views/settingsView";
-import { createModal } from "./views/modal";
+import { renderSidebar } from "./app/sidebar";
+import { renderGallery, renderSkeleton } from "./features/gallery/gallery";
+import { createModal } from "./features/gallery/modal";
+import { renderUploadView } from "./features/upload/upload";
+import { renderSettingsView } from "./features/settings/settingsView";
 import type { ImageItem, ViewName } from "./lib/types";
 import { copyText, feedbackCopied, formatContent, showToast } from "./lib/utils";
 

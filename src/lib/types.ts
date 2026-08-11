@@ -20,6 +20,8 @@ export interface Settings {
   renameReplace: string;
   /** 复制链接的格式：纯 URL 或 Markdown 图片语法 */
   copyFormat: "url" | "markdown";
+  /** WebP 压缩率 1-100，越低体积越小 */
+  quality: number;
 }
 
 /** 上传队列项 */
@@ -34,6 +36,11 @@ export interface QueueItem {
   pct: number;
   done: boolean;
   path?: string;
+  /** 真实磁盘路径（Tauri 拖拽/对话框获取），用于 invoke 转换 */
+  inputPath: string;
+  /** 转换输出路径（与 inputPath 同目录 .webp） */
+  outputPath: string;
+  failed?: boolean;
 }
 
 export type ViewName = "gallery" | "upload" | "settings";

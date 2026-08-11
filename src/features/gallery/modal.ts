@@ -1,7 +1,7 @@
-import type { ImageItem } from "../lib/types";
-import { formatContent, imgSrc } from "../lib/utils";
-import { icon } from "../lib/icons";
-import { getSettings, saveSettings } from "../lib/settings";
+import type { ImageItem } from "../../lib/types";
+import { formatContent, imgSrc } from "../../lib/utils";
+import { icon } from "../../lib/icons";
+import { getSettings, saveSettings } from "../../lib/settings";
 
 export interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;

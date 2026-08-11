@@ -7,6 +7,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   renameFind: "",
   renameReplace: "",
   copyFormat: "url",
+  quality: 80,
 };
 
 let settings: Settings = load();

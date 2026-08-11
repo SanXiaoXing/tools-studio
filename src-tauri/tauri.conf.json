@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "assets_studio",
+  "productName": "Assets Studio",
   "version": "0.1.0",
   "identifier": "cn.sanxiaoxing.assets_studio",
   "build": {
@@ -19,7 +19,11 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {

@@ -1,6 +1,6 @@
-import type { ImageItem } from "../lib/types";
-import { esc, imgSrc } from "../lib/utils";
-import { icon } from "../lib/icons";
+import type { ImageItem } from "../../lib/types";
+import { esc, imgSrc } from "../../lib/utils";
+import { icon } from "../../lib/icons";
 
 export interface GalleryCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
