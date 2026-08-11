@@ -1,10 +1,13 @@
 import type { ImageItem, QueueItem } from "../../lib/types";
-import { esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
+import { basename, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
-import { applyRename, buildPath, getSettings, splitName } from "../../lib/settings";
+import { getSettings } from "../../lib/settings";
+import { applyRename, buildPath, splitName } from "../../lib/naming";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import ConfirmUpload from "./ConfirmUpload";
 
 export interface UploadCallbacks {
   /** 单张转换完成，交由主流程入列浏览视图 */
@@ -12,7 +15,10 @@ export interface UploadCallbacks {
   onQueueCopy: (q: QueueItem, btn: HTMLButtonElement) => void;
 }
 
-const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
+/** renderUploadView 返回值：供外部（全局拖拽）发起带二次确认的上传 */
+export interface UploadApi {
+  requestUpload: (paths: string[]) => void;
+}
 
 /** 读取转换后图片尺寸（promise 封装） */
 const readDimsAsync = (url: string): Promise<string> =>
@@ -20,7 +26,7 @@ const readDimsAsync = (url: string): Promise<string> =>
     readDims(url, (w, h) => resolve(w && h ? `${w} × ${h}` : "未知"));
   });
 
-export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): void {
+export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): UploadApi {
   const queue: QueueItem[] = [];
   let total = 0;
   let done = 0;
@@ -34,11 +40,11 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): v
       <p class="text-[13px] text-ink3">或点击选择文件，支持 PNG、JPG、WebP 格式，单张不超过 20 MB，可一次选择多张</p>
       <button class="mt-4 inline-flex items-center gap-2 rounded-lg px-4.5 py-2.5 bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition" type="button">选择图片文件</button>
     </div>
-    <div class="queue bg-surface border border-line rounded-xl shadow-card overflow-hidden" hidden>
-      <div class="flex items-center justify-between px-4.5 py-3.5 text-[13px] font-semibold border-b border-line">
+    <div class="queue flex flex-col max-h-[55dvh] bg-surface border border-line rounded-xl shadow-card overflow-hidden" hidden>
+      <div class="flex items-center justify-between px-4.5 py-3.5 text-[13px] font-semibold border-b border-line shrink-0">
         <span>上传队列</span><span class="q-count text-xs font-medium text-ink3 tnum"></span>
       </div>
-      <div class="q-list"></div>
+      <div class="q-list overflow-y-auto min-h-0"></div>
     </div>
   </div>`;
 
@@ -70,16 +76,11 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): v
     q.sizeAfter = formatBytes(outSize);
     q.dims = "读取中…";
     q.outputPath = outPath;
-    // 重命名规则 + 按上传日期归档（月份自动更新），扩展名恒为 webp
+    // 重命名规则 + 路径完全由模板生成（默认模板含 {YYYYMMDD}-{HHmmss}-{seq} 保证唯一，同秒多图靠序号兜底）
     const { base } = splitName(q.name);
     const newBase = applyRename(base);
     const newName = newBase + ".webp";
-    // 日期模板同批多图会生成相同 key；模板 {YYYYMMDD} 已含日期，这里只拼 时分秒 + 队列序号区分（同秒内多张靠序号兜底）
-    const d = new Date();
-    const p = (n: number) => String(n).padStart(2, "0");
-    const ts = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-    const uniqueId = `${ts}-${++seq}`;
-    const path = buildPath(newBase, "webp").replace(/\.webp$/, `-${uniqueId}.webp`);
+    const path = buildPath(newBase, "webp", undefined, ++seq);
     q.path = path;
     const outUrl = convertFileSrc(outPath);
     readDimsAsync(outUrl).then((dims) => {
@@ -147,26 +148,41 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): v
     processNext();
   };
 
-  // 点击选择文件 → Tauri 对话框（返回真实路径）
+  // ---- 二次确认弹窗（React 组件挂载，拖拽与手动选择共用）----
+  const confirmRoot = createRoot(document.body.appendChild(document.createElement("div")));
+
+  const requestUpload = (paths: string[]): void => {
+    const files = paths.filter((p) => /\.(png|jpe?g|webp)$/i.test(p));
+    if (files.length === 0) {
+      showToast("未检测到支持的图片文件");
+      return;
+    }
+    document.body.style.overflow = "hidden";
+    confirmRoot.render(
+      createElement(ConfirmUpload, {
+        paths: files,
+        onConfirm: (remaining) => {
+          document.body.style.overflow = "";
+          confirmRoot.render(null);
+          addPaths(remaining);
+        },
+        onCancel: () => {
+          document.body.style.overflow = "";
+          confirmRoot.render(null);
+        },
+      }),
+    );
+  };
+
+  // 点击选择文件 → Tauri 对话框（返回真实路径）→ 二次确认
   drop.addEventListener("click", () => {
     void open({
       multiple: true,
       filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp"] }],
     }).then((picked) => {
       if (!picked) return;
-      addPaths(Array.isArray(picked) ? picked : [picked]);
+      requestUpload(Array.isArray(picked) ? picked : [picked]);
     });
-  });
-
-  // 原生拖拽事件（Tauri 拦截 HTML5 drop，必须用它拿真实路径）
-  void getCurrentWebview().onDragDropEvent((event) => {
-    const t = event.payload.type;
-    if (t === "over") drop.classList.add("bg-accent-soft", "border-accent");
-    if (t === "leave") drop.classList.remove("bg-accent-soft", "border-accent");
-    if (t === "drop") {
-      drop.classList.remove("bg-accent-soft", "border-accent");
-      addPaths(event.payload.paths);
-    }
   });
 
   queueList.addEventListener("click", (e) => {
@@ -176,6 +192,8 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): v
     const q = queue[Number(row?.getAttribute("data-i"))];
     if (q && q.done) cb.onQueueCopy(q, btn);
   });
+
+  return { requestUpload };
 }
 
 function queueRowHTML(q: QueueItem, i: number): string {

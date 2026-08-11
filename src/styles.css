@@ -92,6 +92,39 @@
   animation: shimmer 1.2s infinite linear;
 }
 
+/* 全局拖拽遮罩（main.ts）：深色毛玻璃 + 品牌色径向光晕 + 虚线拖放框 */
+.drag-overlay {
+  background:
+    radial-gradient(60% 55% at 50% 42%, var(--color-accent-soft) 0%, transparent 62%),
+    var(--color-overlay);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/* 呼吸图标：暗示"松开即上传"（只动 transform/opacity）；放大上传图标 svg */
+.drag-overlay-icon {
+  animation: overlay-breathe 2s ease-in-out infinite;
+}
+
+.drag-overlay-icon svg {
+  width: 56px;
+  height: 56px;
+}
+
+@keyframes overlay-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.07); }
+}
+
+/* 降透明度偏好：去掉毛玻璃，保证可读性 */
+@media (prefers-reduced-transparency: reduce) {
+  .drag-overlay {
+    background: var(--color-overlay);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 /* 减少动效（DESIGN-SPEC §5） */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

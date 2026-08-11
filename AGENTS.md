@@ -24,6 +24,7 @@ Desktop image-workflow tool (drag → compress → upload → copy Markdown link
 - `Job` = one user workflow; `ProcessResult` = `ImageInfo` + `OutputFormats`; generate all formats, consumer picks by UI state (D-004/005/006).
 - Pure-Rust image crates only (`oxipng` + `image`), zero C dependencies (D-001).
 - Worker = storage gateway only (`PUT/DELETE/GET /objects`, `X-API-Key`), never image processing (D-007).
+- Code organization: keep files focused on a single responsibility. Do not put all components, functions, or utilities into one file. Extract reusable components, helper functions, and independent modules into dedicated files, and prefer reuse/composition over duplicating similar code.
 
 ## Other gotchas
 

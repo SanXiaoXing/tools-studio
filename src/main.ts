@@ -1,10 +1,14 @@
 import { renderSidebar } from "./app/sidebar";
 import { renderGallery, renderSkeleton } from "./features/gallery/gallery";
 import { createModal } from "./features/gallery/modal";
-import { renderUploadView } from "./features/upload/upload";
+import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import type { ImageItem, ViewName } from "./lib/types";
 import { copyText, feedbackCopied, formatContent, showToast } from "./lib/utils";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import DragMask from "./app/DragMask";
 
 /** mock 数据（原型演示用，非真实上传数据；真实数据来自上传流程的 objectURL） */
 const DATA: ImageItem[] = [
@@ -122,7 +126,7 @@ function render(): void {
   gallerySub.textContent = `共 ${items.length} 张图片，点击图片查看详情`;
 }
 
-renderUploadView(uploadBody, {
+const uploadApi: UploadApi = renderUploadView(uploadBody, {
   onUploaded: (it) => {
     items = [it].concat(items);
     render();
@@ -133,6 +137,26 @@ renderUploadView(uploadBody, {
   },
 });
 renderSettingsView(settingsBody);
+
+// ---- 全局拖拽遮罩（React 组件挂载）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
+const dragRoot = createRoot(document.body.appendChild(document.createElement("div")));
+let dragVisible = false;
+const setDragVisible = (v: boolean): void => {
+  if (dragVisible === v) return;
+  dragVisible = v;
+  dragRoot.render(createElement(DragMask, { isVisible: v }));
+};
+
+void getCurrentWebview().onDragDropEvent((event) => {
+  const t = event.payload.type;
+  if (t === "enter" || t === "over") setDragVisible(true);
+  if (t === "leave") setDragVisible(false);
+  if (t === "drop") {
+    setDragVisible(false);
+    switchView("upload");
+    uploadApi.requestUpload(event.payload.paths);
+  }
+});
 
 // 首屏骨架屏（模拟加载状态，DESIGN-SPEC §3.8）
 renderSkeleton(galleryBody);

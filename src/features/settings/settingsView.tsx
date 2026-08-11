@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
-import { SETTINGS_DEFAULTS, fillTemplate, getSettings, saveSettings } from "../../lib/settings";
+import { SETTINGS_DEFAULTS, getSettings, saveSettings } from "../../lib/settings";
+import { fillTemplate } from "../../lib/naming";
 import { showToast } from "../../lib/utils";
 import ElasticSlider from "./ElasticSlider";
 
@@ -35,6 +36,7 @@ export function renderSettingsView(container: HTMLElement): void {
             可用占位符：
             <code class="${CODE_CLS}">{YYYY}</code> 年、<code class="${CODE_CLS}">{MM}</code> 月、
             <code class="${CODE_CLS}">{DD}</code> 日、<code class="${CODE_CLS}">{YYYYMMDD}</code> 年月日、
+            <code class="${CODE_CLS}">{HHmmss}</code> 时分秒、<code class="${CODE_CLS}">{seq}</code> 序号、
             <code class="${CODE_CLS}">{name}</code> 重命名后文件名、<code class="${CODE_CLS}">{ext}</code> 扩展名
           </p>
         </div>
@@ -132,7 +134,7 @@ export function renderSettingsView(container: HTMLElement): void {
     }
     renameOld.textContent = sample;
     renameNew.textContent = renamed + "." + ext;
-    pathPreview.textContent = fillTemplate(setPath.value || SETTINGS_DEFAULTS.pathTemplate, renamed, ext);
+    pathPreview.textContent = fillTemplate(setPath.value || SETTINGS_DEFAULTS.pathTemplate, renamed, ext, undefined, 1);
   };
 
   saveBtn.addEventListener("click", () => {

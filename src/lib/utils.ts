@@ -6,7 +6,11 @@ import { icon } from "./icons";
 export const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 
-export const qs = <T extends HTMLElement>(sel: string): T => document.querySelector(sel) as T;
+/** 补零到两位（日期/时间字段共用） */
+export const pad2 = (n: number): string => String(n).padStart(2, "0");
+
+/** 取路径最后一段文件名 */
+export const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
 
 export const formatBytes = (b: number): string => {
   if (b < 1024) return b + " B";
@@ -16,8 +20,7 @@ export const formatBytes = (b: number): string => {
 
 export const nowDate = (): string => {
   const d = new Date();
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
 /** 读取图片真实尺寸（上传预览用） */
@@ -78,12 +81,9 @@ export const copyText = async (t: string): Promise<boolean> => {
   }
 };
 
-/** 链接 = 域名 + 归档路径（DESIGN.md §5.2） */
-export const linkOf = (path: string): string => `${getSettings().domain}/${path}`;
-
 /** 按设置的链接格式生成复制内容：纯 URL 或 Markdown 图片语法 */
 export const formatContent = (it: { path: string; name: string }): string => {
-  const url = linkOf(it.path);
+  const url = `${getSettings().domain}/${it.path}`;
   return getSettings().copyFormat === "markdown" ? `![${it.name}](${url})` : url;
 };
 

@@ -16,6 +16,7 @@ interface ElasticSliderProps {
   onChange?: (value: number) => void;
 }
 
+/** 弹性滑块（React Bits ElasticSlider）：拖动越界时轨道弹性拉伸/收缩，hover 放大 */
 const ElasticSlider: React.FC<ElasticSliderProps> = ({
   defaultValue = 50,
   startingValue = 0,
@@ -25,43 +26,6 @@ const ElasticSlider: React.FC<ElasticSliderProps> = ({
   stepSize = 1,
   leftIcon = <>-</>,
   rightIcon = <>+</>,
-  onChange,
-}) => {
-  return (
-    <div className={`flex flex-col items-center justify-center gap-4 w-full ${className}`}>
-      <Slider
-        defaultValue={defaultValue}
-        startingValue={startingValue}
-        maxValue={maxValue}
-        isStepped={isStepped}
-        stepSize={stepSize}
-        leftIcon={leftIcon}
-        rightIcon={rightIcon}
-        onChange={onChange}
-      />
-    </div>
-  );
-};
-
-interface SliderProps {
-  defaultValue: number;
-  startingValue: number;
-  maxValue: number;
-  isStepped: boolean;
-  stepSize: number;
-  leftIcon: React.ReactNode;
-  rightIcon: React.ReactNode;
-  onChange?: (value: number) => void;
-}
-
-const Slider: React.FC<SliderProps> = ({
-  defaultValue,
-  startingValue,
-  maxValue,
-  isStepped,
-  stepSize,
-  leftIcon,
-  rightIcon,
   onChange,
 }) => {
   const [value, setValue] = useState<number>(defaultValue);
@@ -123,7 +87,7 @@ const Slider: React.FC<SliderProps> = ({
   };
 
   return (
-    <>
+    <div className={`flex flex-col items-center justify-center gap-4 w-full ${className}`}>
       <motion.div
         onHoverStart={() => animate(scale, 1.2)}
         onHoverEnd={() => animate(scale, 1)}
@@ -205,7 +169,7 @@ const Slider: React.FC<SliderProps> = ({
       <p className="text-[13px] font-semibold text-ink2 tnum tracking-wide">
         {Math.round(value)}
       </p>
-    </>
+    </div>
   );
 };
 
