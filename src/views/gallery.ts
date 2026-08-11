@@ -96,7 +96,12 @@ function onClick(e: MouseEvent, items: ImageItem[], cb: GalleryCallbacks): void 
     if (act === "cancel") cancelConfirm(card);
     return;
   }
-  if ((e.target as HTMLElement).closest("img")) cb.onDetail(it);
+  // 点击图片区域（图片本体或悬停遮罩的非按钮部分）直接打开详情
+  const t = e.target as HTMLElement;
+  if (t.closest(".overlay") || t.closest("img")) {
+    cancelConfirm(card); // 若正处于删除确认态，先复位再打开详情
+    cb.onDetail(it);
+  }
 }
 
 function renderEmpty(container: HTMLElement, cb: GalleryCallbacks): void {
