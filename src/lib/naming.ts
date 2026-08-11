@@ -1,17 +1,6 @@
 import { getSettings } from "./settings";
 import { pad2 } from "./utils";
 
-/** 正则重命名（作用于文件名主体，扩展名不变），按设置中的查找/替换规则 */
-export const applyRename = (base: string): string => {
-  const { renameFind, renameReplace } = getSettings();
-  if (!renameFind) return base;
-  try {
-    return base.replace(new RegExp(renameFind, "g"), renameReplace);
-  } catch {
-    return base;
-  }
-};
-
 /** 填充路径模板占位符（设置页预览与上传流程共用）。
  * 支持：{YYYY} 年、{MM} 月、{DD} 日、{YYYYMMDD} 年月日、{HHmmss} 时分秒、
  * {seq} 批次内序号（同秒多图区分）、{name} 重命名后文件名、{ext} 扩展名 */

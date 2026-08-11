@@ -16,8 +16,6 @@ export interface ImageItem {
 export interface Settings {
   domain: string;
   pathTemplate: string;
-  renameFind: string;
-  renameReplace: string;
   /** 复制链接的格式：纯 URL 或 Markdown 图片语法 */
   copyFormat: "url" | "markdown";
   /** WebP 压缩率 1-100，越低体积越小 */

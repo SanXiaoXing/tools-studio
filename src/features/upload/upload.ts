@@ -2,7 +2,7 @@ import type { ImageItem, QueueItem } from "../../lib/types";
 import { basename, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings } from "../../lib/settings";
-import { applyRename, buildPath, splitName } from "../../lib/naming";
+import { buildPath, splitName } from "../../lib/naming";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { createElement } from "react";
@@ -76,11 +76,10 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     q.sizeAfter = formatBytes(outSize);
     q.dims = "读取中…";
     q.outputPath = outPath;
-    // 重命名规则 + 路径完全由模板生成（默认模板含 {YYYYMMDD}-{HHmmss}-{seq} 保证唯一，同秒多图靠序号兜底）
+    // 路径完全由模板生成（默认模板含 {YYYYMMDD}-{HHmmss}-{seq} 保证唯一，同秒多图靠序号兜底）
     const { base } = splitName(q.name);
-    const newBase = applyRename(base);
-    const newName = newBase + ".webp";
-    const path = buildPath(newBase, "webp", undefined, ++seq);
+    const newName = base + ".webp";
+    const path = buildPath(base, "webp", undefined, ++seq);
     q.path = path;
     const outUrl = convertFileSrc(outPath);
     readDimsAsync(outUrl).then((dims) => {

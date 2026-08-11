@@ -4,8 +4,6 @@ import type { Settings } from "./types";
 export const SETTINGS_DEFAULTS: Settings = {
   domain: "https://cdn.assets-studio.dev",
   pathTemplate: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
-  renameFind: "",
-  renameReplace: "",
   copyFormat: "url",
   quality: 80,
 };
