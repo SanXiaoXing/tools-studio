@@ -95,28 +95,40 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
       });
     });
     renderQueue();
-    processNext();
   };
 
+  // 并发转换窗口：同时最多 MAX_CONCURRENT 张，兼顾速度与 CPU 占用
+  const MAX_CONCURRENT = 3;
+  let running = 0;
+
   const processNext = (): void => {
-    const q = queue.find((x) => !x.done && !x.failed);
-    if (!q) return;
-    q.status = "正在转换为 WebP";
-    q.pct = 45;
-    updateRow(q);
-    invoke<[number, number, string]>("convert_to_webp", {
-      input: q.inputPath,
-      quality: getSettings().quality,
-    })
-      .then(([inSize, outSize, outPath]) => finish(q, inSize, outSize, outPath))
-      .catch((e) => {
-        q.failed = true;
-        q.status = "转换失败";
-        q.pct = 100;
-        showToast(`转换失败：${String(e)}`);
-        renderQueue();
-        processNext();
-      });
+    while (running < MAX_CONCURRENT) {
+      // 只取尚未启动的（status 仍为"等待转换"）；已启动的由 status 标记，避免并发窗口重复选中同一张
+      const q = queue.find((x) => x.status === "等待转换");
+      if (!q) return;
+      running += 1;
+      q.status = "正在转换为 WebP";
+      q.pct = 45;
+      updateRow(q);
+      invoke<[number, number, string]>("convert_to_webp", {
+        input: q.inputPath,
+        quality: getSettings().quality,
+      })
+        .then(([inSize, outSize, outPath]) => {
+          running -= 1;
+          finish(q, inSize, outSize, outPath);
+          processNext();
+        })
+        .catch((e) => {
+          running -= 1;
+          q.failed = true;
+          q.status = "转换失败";
+          q.pct = 100;
+          showToast(`转换失败：${String(e)}`);
+          renderQueue();
+          processNext();
+        });
+    }
   };
 
   const addPaths = (paths: string[]): void => {

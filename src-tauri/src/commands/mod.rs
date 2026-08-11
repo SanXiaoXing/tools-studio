@@ -11,9 +11,15 @@ pub fn get_config() -> Result<config::Config, AppError> {
 }
 
 /// 将图片转换为 WebP（减小体积）：输入为本地文件路径，quality 1-100（可选，默认 80）。
-/// 输出写入系统临时目录，返回 (输入大小, 输出大小, 输出路径)
+/// 输出写入系统临时目录，返回 (输入大小, 输出大小, 输出路径)。
+/// async + spawn_blocking：图片解码/编码是 CPU 密集任务，不能占 Tauri 主线程，否则拖拽/点击会卡顿。
 #[tauri::command]
-pub fn convert_to_webp(input: String, quality: Option<f32>) -> Result<(u64, u64, String), AppError> {
-    let (in_size, out_size, out_path) = compress::convert_to_webp(&PathBuf::from(input), quality.unwrap_or(80.0))?;
-    Ok((in_size, out_size, out_path.to_string_lossy().into_owned()))
+pub async fn convert_to_webp(input: String, quality: Option<f32>) -> Result<(u64, u64, String), AppError> {
+    let quality = quality.unwrap_or(80.0);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (in_size, out_size, out_path) = compress::convert_to_webp(&PathBuf::from(input), quality)?;
+        Ok((in_size, out_size, out_path.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|e| AppError::Io(format!("转换任务失败: {e}")))?
 }
