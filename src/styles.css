@@ -92,13 +92,31 @@
   animation: shimmer 1.2s infinite linear;
 }
 
-/* 全局拖拽遮罩（main.ts）：深色毛玻璃 + 品牌色径向光晕 + 虚线拖放框 */
+/* 全局拖拽遮罩（main.ts）：强高斯毛玻璃 + 品牌色径向光晕 + 虚线拖放框
+   注意：背景必须半透明，backdrop-filter 才能模糊到背后的内容；
+   浅色主题下 --color-accent-soft 为不透明色，会遮住中心模糊，
+   故此处改用带 alpha 的局部颜色，让模糊在整片遮罩上都可见。 */
 .drag-overlay {
   background:
-    radial-gradient(60% 55% at 50% 42%, var(--color-accent-soft) 0%, transparent 62%),
-    var(--color-overlay);
-  backdrop-filter: blur(14px) saturate(1.15);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    radial-gradient(60% 55% at 50% 42%, rgb(37 99 235 / 22%) 0%, transparent 62%),
+    rgb(15 23 42 / 42%);
+  backdrop-filter: blur(40px) saturate(1.3) brightness(0.96);
+  -webkit-backdrop-filter: blur(40px) saturate(1.3) brightness(0.96);
+  animation: overlay-fade-in 160ms ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  .drag-overlay {
+    background:
+      radial-gradient(60% 55% at 50% 42%, rgb(37 99 235 / 30%) 0%, transparent 62%),
+      rgb(2 6 12 / 52%);
+  }
+}
+
+/* 淡入：遮罩与高斯模糊渐显，避免强模糊瞬间跳变（仅动 opacity） */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* 呼吸图标：暗示"松开即上传"（只动 transform/opacity）；放大上传图标 svg */
@@ -114,15 +132,6 @@
 @keyframes overlay-breathe {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.07); }
-}
-
-/* 降透明度偏好：去掉毛玻璃，保证可读性 */
-@media (prefers-reduced-transparency: reduce) {
-  .drag-overlay {
-    background: var(--color-overlay);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 
 /* 减少动效（DESIGN-SPEC §5） */
