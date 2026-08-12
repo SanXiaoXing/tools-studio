@@ -37,3 +37,15 @@ pub async fn upload_image(
 ) -> Result<upload::UploadedInfo, AppError> {
     upload::upload_file(&server, &api_key, &key, &content_type, &PathBuf::from(file_path)).await
 }
+
+/// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）
+#[tauri::command]
+pub fn export_settings(path: String, content: String) -> Result<(), AppError> {
+    std::fs::write(&path, content).map_err(|e| AppError::Io(format!("写入备份文件失败: {e}")))
+}
+
+/// 导入设置备份：读取备份文件内容返回给前端解析（设置页「导入备份」）
+#[tauri::command]
+pub fn import_settings(path: String) -> Result<String, AppError> {
+    std::fs::read_to_string(&path).map_err(|e| AppError::Io(format!("读取备份文件失败: {e}")))
+}

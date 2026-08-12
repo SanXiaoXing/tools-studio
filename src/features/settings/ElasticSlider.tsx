@@ -14,6 +14,8 @@ interface ElasticSliderProps {
   rightIcon?: React.ReactNode;
   /** 值变化回调（拖动/步进时触发，四舍五入后的数值） */
   onChange?: (value: number) => void;
+  /** 拖动结束回调（pointerup / 失焦提交，自动保存用） */
+  onCommit?: (value: number) => void;
 }
 
 /** 弹性滑块（React Bits ElasticSlider）：拖动越界时轨道弹性拉伸/收缩，hover 放大 */
@@ -27,6 +29,7 @@ const ElasticSlider: React.FC<ElasticSliderProps> = ({
   leftIcon = <>-</>,
   rightIcon = <>+</>,
   onChange,
+  onCommit,
 }) => {
   const [value, setValue] = useState<number>(defaultValue);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -78,6 +81,7 @@ const ElasticSlider: React.FC<ElasticSliderProps> = ({
 
   const handlePointerUp = () => {
     animate(overflow, 0, { type: "spring", bounce: 0.5 });
+    onCommit?.(Math.round(value));
   };
 
   const getRangePercentage = (): number => {

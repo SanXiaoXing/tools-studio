@@ -12,7 +12,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::convert_to_webp,
-            commands::upload_image
+            commands::upload_image,
+            commands::export_settings,
+            commands::import_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

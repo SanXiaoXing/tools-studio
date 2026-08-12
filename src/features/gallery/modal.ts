@@ -1,7 +1,7 @@
 import type { ImageItem } from "../../lib/types";
 import { formatContent, imgSrc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
-import { getSettings, saveSettings } from "../../lib/settings";
+import { getSettings, updateSettings } from "../../lib/settings";
 
 export interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
@@ -92,7 +92,7 @@ export function createModal(cb: ModalCallbacks): DetailModal {
   segBtns.forEach((b) =>
     b.addEventListener("click", () => {
       const f = b.getAttribute("data-format") as "url" | "markdown";
-      saveSettings({ ...getSettings(), copyFormat: f });
+      updateSettings({ copyFormat: f });
       applySeg(f);
       if (current) mLink.value = formatContent(current);
     }),

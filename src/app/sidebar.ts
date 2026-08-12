@@ -1,9 +1,9 @@
 import { icon } from "../lib/icons";
 import type { ViewName } from "../lib/types";
 
+/** 导航仅保留视图切换项；上传入口统一为顶部 CTA（upload-cta），避免重复入口 */
 const NAV: Array<{ view: ViewName; label: string; icon: string }> = [
   { view: "gallery", label: "浏览图片", icon: icon.image },
-  { view: "upload", label: "上传图片", icon: icon.upload },
   { view: "settings", label: "设置", icon: icon.sliders },
 ];
 
