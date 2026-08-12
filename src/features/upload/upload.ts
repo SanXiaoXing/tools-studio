@@ -1,5 +1,5 @@
 import type { ImageItem, QueueItem } from "../../lib/types";
-import { basename, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
+import { basename, errorMessage, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings } from "../../lib/settings";
 import { buildPath, splitName } from "../../lib/naming";
@@ -109,11 +109,13 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
       q.status = "正在转换为 WebP";
       q.pct = 45;
       updateRow(q);
+      let stage: "convert" | "upload" = "convert";
       invoke<[number, number, string]>("convert_to_webp", {
         input: q.inputPath,
         quality: getSettings().quality,
       })
         .then(([inSize, outSize, outPath]) => {
+          stage = "upload";
           q.status = "正在上传";
           q.pct = 80;
           updateRow(q);
@@ -122,12 +124,14 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
           const path = buildPath(base, "webp", undefined, ++seq);
           q.path = path;
           const s = getSettings();
+          // Tauri v2 命令参数：JS 端用驼峰命名（自动转 Rust 蛇形参数），
+          // 必须用 contentType / filePath，不能写 content_type / file_path，否则报 invalid args。
           return invoke<{ key: string; url: string }>("upload_image", {
             server: s.server,
             apiKey: s.apiKey,
             key: path,
-            content_type: "image/webp",
-            file_path: outPath,
+            contentType: "image/webp",
+            filePath: outPath,
           }).then((res) => {
             running -= 1;
             finish(q, inSize, outSize, outPath, res.url);
@@ -137,9 +141,10 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
         .catch((e) => {
           running -= 1;
           q.failed = true;
+          q.failStage = stage;
           q.status = "处理失败";
           q.pct = 100;
-          showToast(`上传失败：${String(e)}`);
+          showToast(`${stage === "upload" ? "上传失败" : "转换失败"}：${errorMessage(e)}`);
           renderQueue();
           processNext();
         });
@@ -226,7 +231,7 @@ function queueRowHTML(q: QueueItem, i: number): string {
   const progress = q.done
     ? ""
     : q.failed
-      ? `<div class="flex justify-between mt-1.5 text-xs"><span class="text-danger font-semibold">转换失败</span></div>`
+      ? `<div class="flex justify-between mt-1.5 text-xs"><span class="text-danger font-semibold">${q.failStage === "upload" ? "上传失败" : "转换失败"}</span></div>`
       : `<div class="h-[5px] rounded-full bg-line overflow-hidden"><div class="q-bar h-full rounded-full bg-accent transition-[width] duration-150" style="width:${q.pct}%"></div></div>
          <div class="flex justify-between mt-1.5 text-xs text-ink3"><span class="q-status">${q.status}</span><span class="q-pct font-semibold text-ink2 tnum">${Math.round(q.pct)}%</span></div>`;
   const doneHtml = q.done

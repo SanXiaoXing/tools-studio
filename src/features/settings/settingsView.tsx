@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { SETTINGS_DEFAULTS, getSettings, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { fillTemplate } from "../../lib/naming";
-import { showToast } from "../../lib/utils";
+import { errorMessage, showToast } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import ElasticSlider from "./ElasticSlider";
@@ -317,7 +317,7 @@ export function renderSettingsView(container: HTMLElement): void {
         await invoke("export_settings", { path, content: JSON.stringify(getSettings(), null, 2) });
         showToast("备份已导出");
       } catch (e) {
-        showToast(`导出失败：${String(e)}`);
+        showToast(`导出失败：${errorMessage(e)}`);
       }
     });
   });
@@ -345,7 +345,7 @@ export function renderSettingsView(container: HTMLElement): void {
         lockDomain.exit();
         showToast("备份已导入");
       } catch (e) {
-        showToast(`导入失败：${String(e)}`);
+        showToast(`导入失败：${errorMessage(e)}`);
       }
     });
   });

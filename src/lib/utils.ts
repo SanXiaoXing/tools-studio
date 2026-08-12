@@ -18,6 +18,24 @@ export const formatBytes = (b: number): string => {
   return (b / (1024 * 1024)).toFixed(1) + " MB";
 };
 
+/** 把 Tauri 返回的错误对象/字符串统一转成可读文本。
+ * Rust 的 AppError enum 默认序列化成 {"Config":"..."} / {"Io":"..."}，
+ * 直接用 String(e) 会得到 [object Object]，需要提取或 JSON 化。 */
+export const errorMessage = (e: unknown): string => {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    if (typeof obj.message === "string") return obj.message;
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return "未知错误";
+    }
+  }
+  return String(e);
+};
+
 export const nowDate = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;

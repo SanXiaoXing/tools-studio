@@ -45,6 +45,8 @@ export interface QueueItem {
   /** 转换输出路径（与 inputPath 同目录 .webp） */
   outputPath: string;
   failed?: boolean;
+  /** 失败发生的阶段：转换（WebP）或上传（Worker），用于区分失败标签 */
+  failStage?: "convert" | "upload";
 }
 
 export type ViewName = "gallery" | "upload" | "settings";
