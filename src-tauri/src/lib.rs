@@ -11,8 +11,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
+            commands::set_config,
             commands::convert_to_webp,
             commands::upload_image,
+            commands::sync_usage,
             commands::export_settings,
             commands::import_settings
         ])

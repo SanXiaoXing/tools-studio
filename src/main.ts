@@ -4,25 +4,11 @@ import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import type { ImageItem, ViewName } from "./lib/types";
-import { copyText, feedbackCopied, formatContent, showToast } from "./lib/utils";
+import { copyText, feedbackCopied, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import DragMask from "./app/DragMask";
-
-/** mock 数据（原型演示用，非真实上传数据；真实数据来自上传流程的 objectURL） */
-const DATA: ImageItem[] = [
-  { name: "banner-1920x640.png", type: "PNG", size: "1.8 MB", dims: "1920 × 640", date: "2026-08-08 14:32", seed: "banner", path: "blog/2026/08/banner-1920x640.png" },
-  { name: "avatar-round.png", type: "PNG", size: "348 KB", dims: "512 × 512", date: "2026-08-08 11:05", seed: "avatar", path: "blog/2026/08/avatar-round.png" },
-  { name: "cover-article.webp", type: "WEBP", size: "624 KB", dims: "1600 × 900", date: "2026-08-07 19:47", seed: "cover", path: "blog/2026/08/cover-article.webp" },
-  { name: "screenshot-dashboard.jpg", type: "JPG", size: "2.4 MB", dims: "2560 × 1440", date: "2026-08-07 16:20", seed: "screenshot", path: "blog/2026/08/screenshot-dashboard.jpg" },
-  { name: "logo-dark.svg", type: "SVG", size: "24 KB", dims: "512 × 512", date: "2026-08-06 09:12", seed: "logo", path: "blog/2026/08/logo-dark.svg" },
-  { name: "hero-og-image.png", type: "PNG", size: "1.1 MB", dims: "1200 × 630", date: "2026-08-05 21:33", seed: "hero", path: "blog/2026/08/hero-og-image.png" },
-  { name: "icon-512.png", type: "PNG", size: "86 KB", dims: "512 × 512", date: "2026-08-05 10:08", seed: "icon", path: "blog/2026/08/icon-512.png" },
-  { name: "thumbnail-note.webp", type: "WEBP", size: "156 KB", dims: "800 × 450", date: "2026-08-04 15:41", seed: "thumbnail", path: "blog/2026/08/thumbnail-note.webp" },
-  { name: "poster-release.png", type: "PNG", size: "3.2 MB", dims: "2480 × 3508", date: "2026-08-03 18:26", seed: "poster", path: "blog/2026/08/poster-release.png" },
-  { name: "gif-demo.gif", type: "GIF", size: "5.6 MB", dims: "960 × 540", date: "2026-08-02 13:15", seed: "gif", path: "blog/2026/08/gif-demo.gif" },
-];
 
 const app = document.querySelector<HTMLElement>("#app")!;
 app.className = "flex h-full";
@@ -78,7 +64,7 @@ function switchView(v: ViewName): void {
   });
 }
 
-const { el: sidebarEl, navCount } = renderSidebar(switchView);
+const { el: sidebarEl, navCount, setStorage } = renderSidebar(switchView);
 
 const content = document.createElement("main");
 content.className = "flex-1 min-w-0 flex flex-col overflow-hidden";
@@ -87,7 +73,8 @@ app.appendChild(content);
 for (const v of Object.keys(views) as ViewName[]) content.appendChild(views[v]);
 switchView("gallery"); // 初始视图：隐藏其余视图并高亮导航
 
-let items: ImageItem[] = DATA.map((d) => ({ ...d }));
+/** 初始为空：首屏不预置任何图片，展示空状态，真实数据来自上传流程 */
+let items: ImageItem[] = [];
 const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
 
 async function copyLink(it: ImageItem, btn?: HTMLButtonElement): Promise<void> {
@@ -123,7 +110,11 @@ function render(): void {
     onEmptyUpload: () => switchView("upload"),
   });
   navCount.textContent = String(items.length);
-  gallerySub.textContent = `共 ${items.length} 张图片，点击图片查看详情`;
+  gallerySub.textContent =
+    items.length === 0 ? "还没有图片，去上传页添加吧" : `共 ${items.length} 张图片，点击图片查看详情`;
+  // 已用空间 = 图片库所有图片真实体积之和（每张 size 来自上传压缩后的体积）
+  const usedBytes = items.reduce((sum, it) => sum + parseSizeToBytes(it.size), 0);
+  setStorage(usedBytes);
 }
 
 const uploadApi: UploadApi = renderUploadView(uploadBody, {
@@ -136,7 +127,13 @@ const uploadApi: UploadApi = renderUploadView(uploadBody, {
     void copyLink({ name: q.name, path: q.path ?? "" } as ImageItem, btn);
   },
 });
-renderSettingsView(settingsBody);
+// 存储用量：用户手动触发（设置页「存储用量」区块，WORKER-V2.md §8）。
+// 拉取成功后覆盖侧边栏「已用空间」为 R2 真实统计，不做启动自动拉取。
+renderSettingsView(settingsBody, {
+  onUsageResolved: (usedBytes) => {
+    setStorage(usedBytes);
+  },
+});
 
 // ---- 全局拖拽遮罩（React 组件挂载）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
 const dragRoot = createRoot(document.body.appendChild(document.createElement("div")));

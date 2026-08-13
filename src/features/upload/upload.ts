@@ -119,16 +119,13 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
           q.status = "正在上传";
           q.pct = 80;
           updateRow(q);
-          // 生成 R2 key（模板）并上传到 Worker → R2
+          // 生成 R2 key（模板）并上传到 Worker → R2；server/apiKey 由 Rust 从 config.json 读取（WORKER-V2.md §7）
           const { base } = splitName(q.name);
           const path = buildPath(base, "webp", undefined, ++seq);
           q.path = path;
-          const s = getSettings();
           // Tauri v2 命令参数：JS 端用驼峰命名（自动转 Rust 蛇形参数），
           // 必须用 contentType / filePath，不能写 content_type / file_path，否则报 invalid args。
           return invoke<{ key: string; url: string }>("upload_image", {
-            server: s.server,
-            apiKey: s.apiKey,
             key: path,
             contentType: "image/webp",
             filePath: outPath,

@@ -15,7 +15,17 @@ export const basename = (p: string): string => p.split(/[\\/]/).pop() || p;
 export const formatBytes = (b: number): string => {
   if (b < 1024) return b + " B";
   if (b < 1024 * 1024) return (b / 1024).toFixed(0) + " KB";
-  return (b / (1024 * 1024)).toFixed(1) + " MB";
+  if (b < 1024 * 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + " MB";
+  return (b / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+};
+
+/** 反向解析大小字符串（如 "1.8 MB"、"348 KB"、"24 KB"、"5.6 MB"）为字节数；解析失败返回 0 */
+const SIZE_UNIT: Record<string, number> = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4 };
+export const parseSizeToBytes = (s: string): number => {
+  const m = s.trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  return Number.isFinite(n) ? n * (SIZE_UNIT[m[2].toUpperCase()] ?? 1) : 0;
 };
 
 /** 把 Tauri 返回的错误对象/字符串统一转成可读文本。
@@ -39,6 +49,13 @@ export const errorMessage = (e: unknown): string => {
 export const nowDate = (): string => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
+/** 生成随机十六进制字符串（API Key 等），基于 Web Crypto 密码学随机源，byteLen 为字节数（2 倍字符数） */
+export const randomHex = (byteLen = 32): string => {
+  const buf = new Uint8Array(byteLen);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
 };
 
 /** 读取图片真实尺寸（上传预览用） */

@@ -1,5 +1,6 @@
 import { icon } from "../lib/icons";
 import type { ViewName } from "../lib/types";
+import { formatBytes } from "../lib/utils";
 
 /** 导航仅保留视图切换项；上传入口统一为顶部 CTA（upload-cta），避免重复入口 */
 const NAV: Array<{ view: ViewName; label: string; icon: string }> = [
@@ -9,9 +10,14 @@ const NAV: Array<{ view: ViewName; label: string; icon: string }> = [
 
 const COLLAPSE_KEY = "as-collapsed";
 
+/** 套餐存储额度（真实配额需后端返回，此处为前端默认值） */
+const STORAGE_TOTAL = 10 * 1024 * 1024 * 1024; // 10 GB
+
 export interface Sidebar {
   el: HTMLElement;
   navCount: HTMLElement;
+  /** 用真实字节数刷新「已用空间」文案与进度条（套餐总额度为 STORAGE_TOTAL） */
+  setStorage: (usedBytes: number) => void;
 }
 
 export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
@@ -47,8 +53,8 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
     <nav class="flex flex-col gap-1">${navHTML}</nav>
     <div class="flex-1"></div>
     <div class="storage px-2">
-      <div class="flex justify-between text-xs text-ink3 mb-2 whitespace-nowrap tnum"><span>已用空间</span><span>2.4 / 10 GB</span></div>
-      <div class="h-1 rounded-full bg-line overflow-hidden"><div class="h-full rounded-full bg-accent" style="width:24%"></div></div>
+      <div class="flex justify-between text-xs text-ink3 mb-2 whitespace-nowrap tnum"><span>已用空间</span><span class="storage-text">0 B / 10.0 GB</span></div>
+      <div class="h-1 rounded-full bg-line overflow-hidden"><div class="storage-bar h-full rounded-full bg-accent" style="width:0%"></div></div>
     </div>
     <button class="collapse-btn flex items-center gap-2.5 w-full px-3 py-2 rounded-[10px] text-ink2 text-[13px] hover:bg-surface3 hover:text-ink transition whitespace-nowrap" type="button" title="收起侧边栏">
       ${icon.panel}<span class="collapse-label">收起侧边栏</span>
@@ -93,5 +99,17 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
   });
 
   const navCount = el.querySelector<HTMLElement>(".nav-count")!;
-  return { el, navCount };
+  const storageText = el.querySelector<HTMLElement>(".storage-text")!;
+  const storageBar = el.querySelector<HTMLElement>(".storage-bar")!;
+
+  /** 用真实的累计字节数刷新「已用空间」文案与进度条 */
+  const setStorage = (usedBytes: number): void => {
+    const safe = Number.isFinite(usedBytes) && usedBytes > 0 ? usedBytes : 0;
+    const pct = STORAGE_TOTAL > 0 ? Math.min(100, (safe / STORAGE_TOTAL) * 100) : 0;
+    storageText.textContent = `${formatBytes(safe)} / ${formatBytes(STORAGE_TOTAL)}`;
+    storageBar.style.width = pct + "%";
+  };
+  setStorage(0); // 初始无图片：已用 0
+
+  return { el, navCount, setStorage };
 }

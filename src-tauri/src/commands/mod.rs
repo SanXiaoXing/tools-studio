@@ -4,6 +4,7 @@ use crate::config;
 use crate::error::AppError;
 use crate::services::compress;
 use crate::services::upload;
+use crate::services::usage;
 
 /// 读取应用配置（连接 Worker 所需的 server / apiKey 等），设置页初始化时调用
 #[tauri::command]
@@ -25,17 +26,33 @@ pub async fn convert_to_webp(input: String, quality: Option<f32>) -> Result<(u64
     .map_err(|e| AppError::Io(format!("转换任务失败: {e}")))?
 }
 
+/// 保存 Worker 连接配置（server / apiKey）到 config.json；设置页保存时调用。
+/// 密钥只存在 Rust 侧配置文件（WORKER-V2.md §7），前端不接触。
+#[tauri::command]
+pub fn set_config(server: String, api_key: String) -> Result<(), AppError> {
+    config::save(&server, &api_key)
+}
+
 /// 将本地文件上传到 Worker → R2（API.md：PUT /objects/{key}）。
+/// server / apiKey 从 config.json 内部读取，前端不再传参（WORKER-V2.md §7）。
 /// 返回 Worker 给的完整访问 URL；异步执行，不阻塞主线程。
 #[tauri::command]
 pub async fn upload_image(
-    server: String,
-    api_key: String,
     key: String,
     content_type: String,
     file_path: String,
 ) -> Result<upload::UploadedInfo, AppError> {
-    upload::upload_file(&server, &api_key, &key, &content_type, &PathBuf::from(file_path)).await
+    let cfg = config::load()?;
+    upload::upload_file(&cfg.server, &cfg.api_key, &key, &content_type, &PathBuf::from(file_path)).await
+}
+
+/// 拉取 R2 存储统计（WORKER-V2.md §7.4）。
+/// rescan=true 调 POST /usage/rescan（全量校准），false 调 GET /usage（读维护计数）。
+/// 由用户在设置页手动触发，不做启动自动拉取。server / apiKey 从 config.json 内部读取。
+#[tauri::command]
+pub async fn sync_usage(rescan: bool) -> Result<usage::UsageInfo, AppError> {
+    let cfg = config::load()?;
+    usage::fetch_usage(&cfg.server, &cfg.api_key, rescan).await
 }
 
 /// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）

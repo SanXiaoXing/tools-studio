@@ -1,7 +1,8 @@
 import { createRoot } from "react-dom/client";
-import { SETTINGS_DEFAULTS, getSettings, parseSettingsBackup, updateSettings } from "../../lib/settings";
+import type { UsageInfo } from "../../lib/types";
+import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { fillTemplate } from "../../lib/naming";
-import { errorMessage, showToast } from "../../lib/utils";
+import { errorMessage, randomHex, showToast } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import ElasticSlider from "./ElasticSlider";
@@ -85,8 +86,12 @@ function lockSection(section: HTMLElement, fields: LockField[], onSave: (values:
   return { exit };
 }
 
-/** 设置视图（DESIGN-SPEC §3.4）：Worker/域名等一次性设置只读锁定，路径模板 / 压缩质量实时预览 */
-export function renderSettingsView(container: HTMLElement): void {
+/** 设置视图（DESIGN-SPEC §3.4）：Worker/域名等一次性设置只读锁定，路径模板 / 压缩质量实时预览。
+ *  onUsageResolved：存储统计拉取成功后回调（字节数），供外部（main.ts）刷新侧边栏已用空间。 */
+export function renderSettingsView(
+  container: HTMLElement,
+  opts?: { onUsageResolved?: (usedBytes: number) => void },
+): void {
   const cur = getSettings();
   container.innerHTML = `
   <div class="settings-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
@@ -118,8 +123,11 @@ export function renderSettingsView(container: HTMLElement): void {
           </div>
           <div>
             <label for="setApiKey" class="block text-[13px] font-medium mb-1.5">API Key</label>
-            <input id="setApiKey" spellcheck="false" autocomplete="off" class="${INPUT_CLS}">
-            <p class="${HINT_CLS}">与 Worker 环境变量 <code class="${CODE_CLS}">API_KEY</code> 的值一致。</p>
+            <div class="flex items-center gap-2">
+              <input id="setApiKey" spellcheck="false" autocomplete="off" class="${INPUT_CLS} flex-1 min-w-0">
+              <button id="genApiKey" type="button" class="${GHOST_BTN_CLS} shrink-0">生成随机</button>
+            </div>
+            <p class="${HINT_CLS}">与 Worker 环境变量 <code class="${CODE_CLS}">API_KEY</code> 的值一致，可点「生成随机」自动创建。</p>
           </div>
           <div class="flex items-center gap-2.5 mt-1">
             <button type="button" data-lock-save class="${PRIMARY_BTN_CLS}">保存</button>
@@ -190,6 +198,18 @@ export function renderSettingsView(container: HTMLElement): void {
         </div>
       </section>
 
+      <section class="bg-surface border border-line rounded-xl shadow-card p-5">
+        <h2 class="text-[15px] font-bold mb-1">存储用量</h2>
+        <p class="text-xs text-ink3 leading-relaxed mb-4.5">查看 R2 图片服务当前占用的存储空间，需手动点击获取。「重新统计」会全量扫描校准。</p>
+        <div class="flex items-center gap-2.5">
+          <div class="flex-1 min-w-0 px-3 py-2.5 rounded-lg bg-surface2 text-[13px] text-ink tnum">
+            <span id="usageText">尚未统计</span>
+          </div>
+          <button id="refreshUsage" class="${GHOST_BTN_CLS}">刷新</button>
+          <button id="rescanUsage" class="${PRIMARY_BTN_CLS}">重新统计</button>
+        </div>
+      </section>
+
     </div>
     <div class="flex items-center gap-2.5 py-0.5 pb-2">
       <button id="resetSettings" class="inline-flex items-center gap-2 rounded-lg px-4.5 py-2.5 border border-line bg-surface text-ink2 text-sm font-medium hover:bg-surface3 hover:text-ink transition" type="button">恢复默认</button>
@@ -204,6 +224,9 @@ export function renderSettingsView(container: HTMLElement): void {
   const pathPreview = $<HTMLElement>("#pathPreview");
   const resetBtn = $<HTMLButtonElement>("#resetSettings");
 
+  /** Worker 连接信息：存 Rust config.json（WORKER-V2.md §7），前端只做展示与透传，不落 localStorage */
+  let conn = { server: "", apiKey: "" };
+
   setPath.value = cur.pathTemplate;
 
   /** 一次性设置：编辑前只能查看，各自独立保存（DESIGN-SPEC §3.4 锁定模式） */
@@ -213,22 +236,44 @@ export function renderSettingsView(container: HTMLElement): void {
       {
         input: setServer,
         display: $<HTMLElement>("#viewServer"),
-        current: () => getSettings().server,
-        render: () => getSettings().server || "未设置",
+        current: () => conn.server,
+        render: () => conn.server || "未设置",
       },
       {
         input: setApiKey,
         display: $<HTMLElement>("#viewApiKey"),
-        current: () => getSettings().apiKey,
-        render: () => maskKey(getSettings().apiKey),
+        current: () => conn.apiKey,
+        render: () => maskKey(conn.apiKey),
         noTitle: true,
       },
     ],
     ([server, apiKey]) => {
-      updateSettings({ server, apiKey });
-      showToast("设置已保存");
+      void invoke("set_config", { server, apiKey })
+        .then(() => {
+          conn = { server, apiKey };
+          lockWorker.exit();
+          showToast("设置已保存");
+        })
+        .catch((e) => showToast(`保存失败：${errorMessage(e)}`));
     },
   );
+
+  // 初始加载：连接配置从 Rust config.json 读取，回填只读展示
+  void invoke<{ server: string; apiKey: string }>("get_config")
+    .then((cfg) => {
+      conn = { server: cfg.server ?? "", apiKey: cfg.apiKey ?? "" };
+      lockWorker.exit();
+    })
+    .catch(() => {
+      /* 未配置时保持空值展示"未设置" */
+    });
+
+  // 生成随机 API Key（Web Crypto，64 位 hex）：填入输入框，保存时随 set_config 写入 config.json。
+  // 生成后需同步到 Worker 环境变量 API_KEY（wrangler secret put API_KEY）。
+  $<HTMLButtonElement>("#genApiKey").addEventListener("click", () => {
+    setApiKey.value = randomHex(32);
+    showToast("已生成随机 API Key，请点保存并同步到 Worker 环境变量");
+  });
   const lockDomain = lockSection(
     $("#lockDomain"),
     [
@@ -296,7 +341,13 @@ export function renderSettingsView(container: HTMLElement): void {
     quality = SETTINGS_DEFAULTS.quality;
     renderQuality();
     updatePreview();
-    lockWorker.exit();
+    // 连接配置存 Rust config.json，恢复默认时一并清空
+    void invoke("set_config", { server: "", apiKey: "" })
+      .then(() => {
+        conn = { server: "", apiKey: "" };
+        lockWorker.exit();
+      })
+      .catch((e) => showToast(`恢复默认失败：${errorMessage(e)}`));
     lockDomain.exit();
     showToast("已恢复默认设置");
   });
@@ -314,7 +365,9 @@ export function renderSettingsView(container: HTMLElement): void {
     }).then(async (path) => {
       if (!path) return;
       try {
-        await invoke("export_settings", { path, content: JSON.stringify(getSettings(), null, 2) });
+        // 备份含完整设置：连接信息（Rust config.json）与本地展示设置合并导出
+        const backup = JSON.stringify({ ...getSettings(), server: conn.server, apiKey: conn.apiKey }, null, 2);
+        await invoke("export_settings", { path, content: backup });
         showToast("备份已导出");
       } catch (e) {
         showToast(`导出失败：${errorMessage(e)}`);
@@ -336,6 +389,12 @@ export function renderSettingsView(container: HTMLElement): void {
           showToast("备份文件格式无效");
           return;
         }
+        // 连接信息写回 Rust config.json（旧备份无连接字段时跳过，保留当前值）
+        const connBackup = parseConnectionBackup(raw);
+        if (connBackup) {
+          await invoke("set_config", { server: connBackup.server, apiKey: connBackup.apiKey });
+          conn = { server: connBackup.server, apiKey: connBackup.apiKey };
+        }
         updateSettings(parsed);
         setPath.value = parsed.pathTemplate;
         quality = parsed.quality;
@@ -349,6 +408,25 @@ export function renderSettingsView(container: HTMLElement): void {
       }
     });
   });
+
+  /** 存储用量：用户手动触发（WORKER-V2.md §8），不做启动自动拉取。
+   *  刷新 = GET /usage（读维护计数），重新统计 = POST /usage/rescan（全量校准）。 */
+  const usageText = $<HTMLElement>("#usageText");
+  const syncUsage = (rescan: boolean): void => {
+    usageText.textContent = "统计中…";
+    void invoke<UsageInfo>("sync_usage", { rescan })
+      .then((u) => {
+        usageText.textContent = `${u.sizeFormatted}（${u.objects} 张）`;
+        opts?.onUsageResolved?.(u.size);
+        showToast(rescan ? "重新统计完成" : "已刷新统计");
+      })
+      .catch((e) => {
+        usageText.textContent = "统计失败";
+        showToast(`统计失败：${errorMessage(e)}`);
+      });
+  };
+  $<HTMLButtonElement>("#refreshUsage").addEventListener("click", () => syncUsage(false));
+  $<HTMLButtonElement>("#rescanUsage").addEventListener("click", () => syncUsage(true));
 
   updatePreview();
 }

@@ -1,9 +1,7 @@
 import type { Settings } from "./types";
 
-/** 默认设置（DESIGN-SPEC §1 / DESIGN.md §5.3） */
+/** 默认设置（DESIGN-SPEC §1 / DESIGN.md §5.3）；连接信息（server/apiKey）在 Rust config.json */
 export const SETTINGS_DEFAULTS: Settings = {
-  server: "",
-  apiKey: "",
   domain: "https://cdn.assets-studio.dev",
   pathTemplate: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
   copyFormat: "url",
@@ -39,13 +37,24 @@ export const parseSettingsBackup = (raw: string): Settings | null => {
     const data = JSON.parse(raw) as Partial<Settings>;
     if (!data || typeof data !== "object") return null;
     const merged: Settings = { ...SETTINGS_DEFAULTS, ...data };
-    if (typeof merged.server !== "string") return null;
-    if (typeof merged.apiKey !== "string") return null;
     if (typeof merged.domain !== "string") return null;
     if (typeof merged.pathTemplate !== "string") return null;
     if (merged.copyFormat !== "url" && merged.copyFormat !== "markdown") return null;
     if (typeof merged.quality !== "number" || merged.quality < 1 || merged.quality > 100) return null;
     return merged;
+  } catch {
+    return null;
+  }
+};
+
+/** 从备份 JSON 中提取 Worker 连接信息（server / apiKey）。
+ *  连接信息存 Rust config.json（WORKER-V2.md §7），导入时需单独写回；
+ *  旧版备份未含这些字段时返回 null。 */
+export const parseConnectionBackup = (raw: string): { server: string; apiKey: string } | null => {
+  try {
+    const data = JSON.parse(raw) as Record<string, unknown>;
+    if (typeof data.server !== "string" || typeof data.apiKey !== "string") return null;
+    return { server: data.server, apiKey: data.apiKey };
   } catch {
     return null;
   }

@@ -46,6 +46,21 @@ pub fn load() -> Result<Config, AppError> {
     serde_json::from_str(&raw).map_err(|e| AppError::Config(format!("{path:?}: {e}")))
 }
 
+/// 保存 Worker 连接配置（server / apiKey）到 config.json。
+/// 基于现有配置合并写入，保留 default_preset / default_output 等字段。
+pub fn save(server: &str, api_key: &str) -> Result<(), AppError> {
+    let mut cfg = load()?;
+    cfg.server = server.trim().to_string();
+    cfg.api_key = api_key.trim().to_string();
+    let path = config_path()?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| AppError::Io(format!("创建配置目录失败: {e}")))?;
+    }
+    let json = serde_json::to_string_pretty(&cfg).map_err(|e| AppError::Config(format!("序列化配置失败: {e}")))?;
+    std::fs::write(&path, json).map_err(|e| AppError::Io(format!("写入配置失败: {e}")))?;
+    Ok(())
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {

@@ -14,12 +14,9 @@ export interface ImageItem {
   objectURL?: string;
 }
 
-/** 设置（DESIGN.md §5.3），持久化于 localStorage("as-settings") */
+/** 设置（DESIGN.md §5.3）：非连接类配置持久化于 localStorage("as-settings")。
+ *  Worker 连接信息（server / apiKey）存 Rust 侧 config.json（WORKER-V2.md §7），不落前端。 */
 export interface Settings {
-  /** Worker API 地址，如 https://your-worker.workers.dev */
-  server: string;
-  /** API Key，与 Worker 环境变量 API_KEY 一致 */
-  apiKey: string;
   domain: string;
   pathTemplate: string;
   /** 复制链接的格式：纯 URL 或 Markdown 图片语法 */
@@ -50,3 +47,12 @@ export interface QueueItem {
 }
 
 export type ViewName = "gallery" | "upload" | "settings";
+
+/** 存储统计响应（WORKER-V2.md §7.4：sync_usage 命令透传 Worker /usage） */
+export interface UsageInfo {
+  objects: number;
+  size: number;
+  /** 人类可读大小（如 "1.71 GB"），Worker 返回，直接展示 */
+  sizeFormatted: string;
+  updatedAt: string;
+}
