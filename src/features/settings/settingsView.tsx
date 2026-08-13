@@ -2,7 +2,8 @@ import { createRoot } from "react-dom/client";
 import type { UsageInfo } from "../../lib/types";
 import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { fillTemplate } from "../../lib/naming";
-import { errorMessage, randomHex, showToast } from "../../lib/utils";
+import { icon } from "../../lib/icons";
+import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import ElasticSlider from "./ElasticSlider";
@@ -124,10 +125,13 @@ export function renderSettingsView(
           <div>
             <label for="setApiKey" class="block text-[13px] font-medium mb-1.5">API Key</label>
             <div class="flex items-center gap-2">
-              <input id="setApiKey" spellcheck="false" autocomplete="off" class="${INPUT_CLS} flex-1 min-w-0">
+              <div class="relative flex-1 min-w-0">
+                <input id="setApiKey" spellcheck="false" autocomplete="off" class="${INPUT_CLS} pr-9">
+                <button id="copyApiKey" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-md text-ink3 hover:text-ink hover:bg-surface3 transition" title="复制 API Key" aria-label="复制 API Key">${icon.copy}</button>
+              </div>
               <button id="genApiKey" type="button" class="${GHOST_BTN_CLS} shrink-0">生成随机</button>
             </div>
-            <p class="${HINT_CLS}">与 Worker 环境变量 <code class="${CODE_CLS}">API_KEY</code> 的值一致，可点「生成随机」自动创建。</p>
+            <p class="${HINT_CLS}">与 Worker 环境变量 <code class="${CODE_CLS}">API_KEY</code> 的值一致，可点「生成随机」自动创建，点输入框右侧图标复制。</p>
           </div>
           <div class="flex items-center gap-2.5 mt-1">
             <button type="button" data-lock-save class="${PRIMARY_BTN_CLS}">保存</button>
@@ -268,11 +272,28 @@ export function renderSettingsView(
       /* 未配置时保持空值展示"未设置" */
     });
 
-  // 生成随机 API Key（Web Crypto，64 位 hex）：填入输入框，保存时随 set_config 写入 config.json。
+  // 生成规则化 API Key（as_ 前缀 + 分段 hex）：填入输入框，保存时随 set_config 写入 config.json。
   // 生成后需同步到 Worker 环境变量 API_KEY（wrangler secret put API_KEY）。
   $<HTMLButtonElement>("#genApiKey").addEventListener("click", () => {
-    setApiKey.value = randomHex(32);
-    showToast("已生成随机 API Key，请点保存并同步到 Worker 环境变量");
+    setApiKey.value = generateApiKey();
+    showToast("已生成随机 API Key，请点「复制」拿去配置 Worker");
+  });
+
+  // 复制 API Key 到剪贴板；成功后图标按钮变绿「✓」（feedbackCheck 纯图标对勾反馈）
+  $<HTMLButtonElement>("#copyApiKey").addEventListener("click", (e) => {
+    const btn = e.currentTarget as HTMLButtonElement;
+    if (!setApiKey.value) {
+      showToast("请先生成或填写 API Key");
+      return;
+    }
+    void copyText(setApiKey.value).then((ok) => {
+      if (ok) {
+        feedbackCheck(btn);
+        showToast("API Key 已复制");
+      } else {
+        showToast("复制失败，请手动复制");
+      }
+    });
   });
   const lockDomain = lockSection(
     $("#lockDomain"),

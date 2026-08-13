@@ -30,6 +30,7 @@
 4. **不做公开服务级防御**：个人自用场景下 Token + 白名单 + 大小限制足够；Rate Limit / WAF 等 Worker 公开化后再加（防过度设计，D-007 职责边界同理）。
 5. **存储统计用「维护计数 + 定期校准」**：不每次查询都全量 list（图片多时会越来越慢）。上传/删除时对 R2 元对象 `_meta/usage.json` 做增量维护，提供 `POST /usage/rescan` 全量重算作为校准入口；增量写入用 etag 乐观锁（CAS）防并发丢更新。
 6. **端点形态保持既有契约**：对话建议的 `POST /upload`、`GET /images`、`DELETE /image/:key` 是通用 REST 形态，与项目已定契约（API.md / 客户端 `upload.rs`）不一致。本方案保留 `PUT /objects/{key}` / `GET /objects` / `DELETE /objects/{key}`，只新增 `GET /usage` 与 `POST /usage/rescan`，能力等价且不重写客户端。
+7. **API Key 格式约定（产品级命名）**：Key 体现产品身份而非个人身份，前缀固定为 `as_live_`（`as` = Assets Studio 产品标识，`live` = 环境）。随机段用 Crockford Base32（去易混淆字符 I/L/O/U，每字符 5 位熵），4 段 × 4 字符 ≈ 80 位熵，短小易读。未来可自然扩展 `as_test_` / `as_dev_` 环境前缀；权限不编码进 Key，由服务端保存 Key 元数据（scopes）管理。客户端生成实现见 `src/lib/utils.ts` 的 `generateApiKey()`，Worker 端只做恒定时间比对，不关心 Key 具体格式。
 
 ---
 

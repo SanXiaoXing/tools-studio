@@ -51,11 +51,27 @@ export const nowDate = (): string => {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
-/** 生成随机十六进制字符串（API Key 等），基于 Web Crypto 密码学随机源，byteLen 为字节数（2 倍字符数） */
-export const randomHex = (byteLen = 32): string => {
-  const buf = new Uint8Array(byteLen);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+/** API Key 固定前缀：`as` = 产品标识（Assets Studio），`live` = 环境。
+ * 体现产品身份而非个人身份（WORKER-V2.md §2 决策 7），未来可扩展 as_test_ / as_dev_。
+ */
+const API_KEY_PREFIX = "as_live_";
+
+/** 随机段字符集：Crockford Base32（去掉 I/L/O/U 易混淆字符），每字符 5 位熵；256 % 32 == 0，无取模偏差 */
+const KEY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * 生成规则化的 API Key：`as_live_` 前缀 + 4 段 × 4 字符随机（Crockford Base32），
+ * 形如 `as_live_K7FM-92QX-W8PT-4N6C`（16 字符 ≈ 80 位熵，短小易读且足够安全）。
+ */
+export const generateApiKey = (): string => {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  const chars = Array.from(bytes, (b) => KEY_ALPHABET[b % KEY_ALPHABET.length]);
+  const segments: string[] = [];
+  for (let i = 0; i < chars.length; i += 4) {
+    segments.push(chars.slice(i, i + 4).join(""));
+  }
+  return API_KEY_PREFIX + segments.join("-");
 };
 
 /** 读取图片真实尺寸（上传预览用） */
@@ -128,6 +144,17 @@ export const feedbackCopied = (btn: HTMLButtonElement, delay = 1600): void => {
   const old = btn.innerHTML;
   btn.style.background = "var(--color-ok)";
   btn.innerHTML = icon.check + "已复制";
+  window.setTimeout(() => {
+    btn.style.background = "";
+    btn.innerHTML = old;
+  }, delay);
+};
+
+/** 纯图标按钮成功反馈：变绿显示 ✓（无文字），delay 后恢复（输入框内图标按钮等场景） */
+export const feedbackCheck = (btn: HTMLButtonElement, delay = 1600): void => {
+  const old = btn.innerHTML;
+  btn.style.background = "var(--color-ok)";
+  btn.innerHTML = icon.check;
   window.setTimeout(() => {
     btn.style.background = "";
     btn.innerHTML = old;
