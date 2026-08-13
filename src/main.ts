@@ -6,7 +6,12 @@ import { renderSettingsView } from "./features/settings/settingsView";
 import type { ImageItem, ViewName } from "./lib/types";
 import { copyText, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
 import { icon } from "./lib/icons";
+import { getSettings } from "./lib/settings";
+import { applyTheme } from "./lib/theme";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+
+// 启动即应用主题（data-theme 驱动 CSS 变量；system 模式由 settings.ts 监听实时跟随）
+applyTheme(getSettings().theme);
 
 const app = document.querySelector<HTMLElement>("#app")!;
 app.className = "flex h-full";

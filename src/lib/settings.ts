@@ -6,6 +6,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   pathTemplate: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
   copyFormat: "url",
   quality: 80,
+  theme: "system",
 };
 
 let settings: Settings = load();
@@ -41,6 +42,7 @@ export const parseSettingsBackup = (raw: string): Settings | null => {
     if (typeof merged.pathTemplate !== "string") return null;
     if (merged.copyFormat !== "url" && merged.copyFormat !== "markdown") return null;
     if (typeof merged.quality !== "number" || merged.quality < 1 || merged.quality > 100) return null;
+    if (merged.theme !== "system" && merged.theme !== "dark" && merged.theme !== "light") return null;
     return merged;
   } catch {
     return null;

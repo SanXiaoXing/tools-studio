@@ -55,6 +55,52 @@
   }
 }
 
+/* 手动深色模式：data-theme="dark" 覆盖浅色变量（与上面系统深色相同 token） */
+:root[data-theme="dark"] {
+  --color-canvas: #0e1116;
+  --color-surface: #161a21;
+  --color-surface2: #1b2029;
+  --color-surface3: #20262f;
+  --color-line: #262d38;
+  --color-ink: #f2f4f7;
+  --color-ink2: #a8b0bc;
+  --color-ink3: #8a93a1;
+  --color-accent: #7aa7ff;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: rgb(37 99 235 / 20%);
+  --color-danger: #f87171;
+  --color-danger-strong: #b91c1c;
+  --color-danger-soft: rgb(220 38 38 / 16%);
+  --color-ok: #4ade80;
+  --color-overlay: rgb(2 6 12 / 70%);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 35%), 0 4px 12px -6px rgb(0 0 0 / 45%);
+  --shadow-card-hover: 0 2px 4px rgb(0 0 0 / 40%), 0 14px 30px -10px rgb(0 0 0 / 60%);
+  --shadow-modal: 0 24px 64px -12px rgb(0 0 0 / 65%);
+}
+
+/* 手动浅色模式：覆盖系统深色偏好，强制回到浅色 token */
+:root[data-theme="light"] {
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface2: #eef0f3;
+  --color-surface3: #f3f4f6;
+  --color-line: #e4e7eb;
+  --color-ink: #1a1d21;
+  --color-ink2: #4b5563;
+  --color-ink3: #6b7280;
+  --color-accent: #2563eb;
+  --color-accent-strong: #1d4ed8;
+  --color-accent-soft: #e8effc;
+  --color-danger: #dc2626;
+  --color-danger-strong: #b91c1c;
+  --color-danger-soft: #fdecec;
+  --color-ok: #16a34a;
+  --color-overlay: rgb(15 23 42 / 58%);
+  --shadow-card: 0 1px 2px rgb(17 24 39 / 5%), 0 4px 12px -6px rgb(17 24 39 / 10%);
+  --shadow-card-hover: 0 2px 4px rgb(17 24 39 / 6%), 0 12px 28px -10px rgb(17 24 39 / 18%);
+  --shadow-modal: 0 24px 64px -16px rgb(17 24 39 / 30%);
+}
+
 /* [hidden] 优先级修复（DESIGN-SPEC §8.1）：防止 display 工具类覆盖 hidden 属性 */
 [hidden] { display: none !important; }
 
@@ -105,12 +151,10 @@
   animation: overlay-fade-in 160ms ease-out;
 }
 
-@media (prefers-color-scheme: dark) {
-  .drag-overlay {
-    background:
-      radial-gradient(60% 55% at 50% 42%, rgb(37 99 235 / 30%) 0%, transparent 62%),
-      rgb(2 6 12 / 52%);
-  }
+:root[data-theme="dark"] .drag-overlay {
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgb(37 99 235 / 30%) 0%, transparent 62%),
+    rgb(2 6 12 / 52%);
 }
 
 /* 淡入：遮罩与高斯模糊渐显，避免强模糊瞬间跳变（仅动 opacity） */
@@ -197,6 +241,19 @@
 .es-tick-minor {
   height: 5px;
   opacity: 0.3;
+}
+
+/* 主题切换颜色过渡：data-theme 变化时背景/文字/边框平滑渐变。
+   用长属性（transition-property）而非简写，避免覆盖组件自身的 transform 过渡；
+   元素已有的 transition 简写（class 优先级更高）优先，不受影响。 */
+@media (prefers-reduced-motion: no-preference) {
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: 0.25s;
+    transition-timing-function: ease;
+  }
 }
 
 /* 减少动效（DESIGN-SPEC §5） */

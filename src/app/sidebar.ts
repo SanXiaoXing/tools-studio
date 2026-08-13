@@ -1,3 +1,4 @@
+import appIcon from "../assets/app-icon.png";
 import { icon } from "../lib/icons";
 import type { ViewName } from "../lib/types";
 import { formatBytes } from "../lib/utils";
@@ -45,7 +46,7 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
 
   el.innerHTML = `
     <a class="brand flex items-center gap-2.5 px-1.5 text-ink text-[15px] font-bold whitespace-nowrap" href="#">
-      ${icon.brand}<span class="brand-name tracking-tight">Assets Studio</span>
+      <img class="brand-icon shrink-0" src="${appIcon}" alt="" width="22" height="22"><span class="brand-name tracking-tight">Assets Studio</span>
     </a>
     <button class="upload-cta flex items-center justify-center gap-2 w-full h-[42px] rounded-[10px] bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition whitespace-nowrap" type="button">
       ${icon.upload}<span class="cta-label">上传图片</span>

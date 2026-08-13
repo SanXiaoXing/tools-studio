@@ -25,10 +25,4 @@ export const icon = {
   eye: svg(PATHS.eye, 16),
   trash: svg(PATHS.trash, 16),
   x: svg(PATHS.x, 16),
-  brand:
-    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
-    '<rect x="3" y="3" width="8" height="8" rx="2" fill="var(--color-accent)"/>' +
-    '<rect x="13" y="3" width="8" height="8" rx="2" fill="var(--color-ink3)"/>' +
-    '<rect x="3" y="13" width="8" height="8" rx="2" fill="var(--color-ink3)"/>' +
-    '<rect x="13" y="13" width="8" height="8" rx="2" fill="none" stroke="var(--color-ink3)"/></svg>',
 } as const;

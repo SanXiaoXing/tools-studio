@@ -1,5 +1,6 @@
 import type { UsageInfo } from "../../lib/types";
 import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
+import { renderThemeSeg } from "../../lib/theme";
 import { fillTemplate } from "../../lib/naming";
 import { icon } from "../../lib/icons";
 import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
@@ -187,6 +188,12 @@ export function renderSettingsView(
       </section>
 
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
+        <h2 class="text-[15px] font-bold mb-1">主题</h2>
+        <p class="text-xs text-ink3 leading-relaxed mb-4.5">切换界面外观，跟随系统会随系统深浅色自动变化。</p>
+        <div id="themeMount"></div>
+      </section>
+
+      <section class="bg-surface border border-line rounded-xl shadow-card p-5">
         <h2 class="text-[15px] font-bold mb-1">压缩质量</h2>
         <p class="text-xs text-ink3 leading-relaxed mb-4.5">上传时转为 WebP 的压缩率，越低体积越小。保存后对新上传生效。</p>
         <div id="qualityMount"></div>
@@ -310,6 +317,10 @@ export function renderSettingsView(
     },
   );
 
+  /** 主题：三选一（跟随系统 / 深色 / 浅色），点击即保存并应用；选中态由滑动指示器表示。
+   *  渲染与事件在 theme.ts 内；setTheme 供恢复默认 / 导入备份同步。 */
+  const themeSeg = renderThemeSeg($("#themeMount"));
+
   /** 压缩质量的当前值（未保存也实时），松手后写入设置模型 */
   let quality = cur.quality;
   const qualitySlider = renderElasticSlider($("#qualityMount"), {
@@ -347,6 +358,7 @@ export function renderSettingsView(
   });
   resetBtn.addEventListener("click", () => {
     updateSettings({ ...SETTINGS_DEFAULTS });
+    themeSeg.setTheme(SETTINGS_DEFAULTS.theme);
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     quality = SETTINGS_DEFAULTS.quality;
     qualitySlider.setValue(quality);
@@ -406,6 +418,7 @@ export function renderSettingsView(
           conn = { server: connBackup.server, apiKey: connBackup.apiKey };
         }
         updateSettings(parsed);
+        themeSeg.setTheme(parsed.theme);
         setPath.value = parsed.pathTemplate;
         quality = parsed.quality;
         qualitySlider.setValue(quality);

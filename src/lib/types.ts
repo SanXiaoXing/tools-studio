@@ -22,6 +22,8 @@ export interface Settings {
   copyFormat: "url" | "markdown";
   /** WebP 压缩率 1-100，越低体积越小 */
   quality: number;
+  /** 主题模式：跟随系统 / 深色 / 浅色 */
+  theme: "system" | "dark" | "light";
 }
 
 /** 上传队列项 */
