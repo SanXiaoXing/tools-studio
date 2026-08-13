@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
-use crate::models::Preset;
 
 /// 应用配置（Architecture.md §5.1）：v1 无设置 UI，直接读 config.json
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -13,18 +12,6 @@ pub struct Config {
     pub server: String,
     /// API Key，与 Worker 环境变量 API_KEY 一致
     pub api_key: String,
-    #[serde(default = "default_preset")]
-    pub default_preset: Preset,
-    #[serde(default = "default_output")]
-    pub default_output: String,
-}
-
-fn default_preset() -> Preset {
-    Preset::default()
-}
-
-fn default_output() -> String {
-    "markdown".into()
 }
 
 /// 配置文件路径：Windows `%USERPROFILE%\.assets-studio\config.json`，macOS `~/.assets-studio/config.json`
@@ -66,8 +53,6 @@ impl Default for Config {
         Self {
             server: String::new(),
             api_key: String::new(),
-            default_preset: default_preset(),
-            default_output: default_output(),
         }
     }
 }

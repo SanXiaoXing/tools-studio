@@ -1,13 +1,12 @@
 /** 领域类型（对应 docs/design/DESIGN-SPEC.md） */
 
-/** 图片项：mock 或上传流程生成，path 为对象存储归档路径 */
+/** 图片项：上传流程生成，path 为对象存储归档路径 */
 export interface ImageItem {
   name: string;
   type: string;
   size: string;
   dims: string;
   date: string;
-  seed?: string;
   path: string;
   /** 完整访问 URL（Worker 上传后返回，优先于 domain+path 拼接） */
   url?: string;

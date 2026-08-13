@@ -134,6 +134,71 @@
   50%      { transform: scale(1.07); }
 }
 
+/* 刻度滑块（elasticSlider.ts）：shadcn 风格外观（8px 轨道 + 圆形 thumb + 数值气泡 + 刻度） */
+.es-body {
+  position: relative; /* 为绝对定位的子元素提供定位上下文 */
+  padding-top: 30px; /* 给顶部数值气泡留空间 */
+}
+.es-track {
+  height: 8px;
+  background: var(--color-line);
+  border-radius: 9999px;
+}
+.es-track:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+.es-fill {
+  width: 0;
+  background: var(--color-accent);
+  border-radius: inherit;
+}
+/* 数值气泡：跟随滑块位置（left 由 JS 设置），指向轨道的小箭头 */
+.es-bubble {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 34px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--color-ink);
+  color: var(--color-canvas);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+  transition: transform 0.15s ease;
+}
+.es-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--color-ink);
+}
+.es-bubble.hot {
+  transform: translateX(-50%) scale(1.2);
+}
+/* 刻度（对齐 demo）：每 5 细线、每 10 粗线 + 数字标签 */
+.es-ticks {
+  margin-top: 12px;
+}
+.es-tick {
+  width: 1px;
+  background: var(--color-ink3);
+}
+.es-tick-major {
+  height: 8px;
+  opacity: 0.6;
+}
+.es-tick-minor {
+  height: 5px;
+  opacity: 0.3;
+}
+
 /* 减少动效（DESIGN-SPEC §5） */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

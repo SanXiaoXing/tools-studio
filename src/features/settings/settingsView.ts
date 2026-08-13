@@ -1,4 +1,3 @@
-import { createRoot } from "react-dom/client";
 import type { UsageInfo } from "../../lib/types";
 import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { fillTemplate } from "../../lib/naming";
@@ -6,7 +5,7 @@ import { icon } from "../../lib/icons";
 import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import ElasticSlider from "./ElasticSlider";
+import { renderElasticSlider } from "./elasticSlider";
 
 const INPUT_CLS =
   "w-full px-3 py-2.5 rounded-lg border border-line bg-surface2 text-ink text-[13px] outline-none focus:border-accent transition-colors";
@@ -311,32 +310,22 @@ export function renderSettingsView(
     },
   );
 
-  /** 弹性滑块的当前值（未保存也实时），保存后写入设置模型 */
+  /** 压缩质量的当前值（未保存也实时），松手后写入设置模型 */
   let quality = cur.quality;
-  const qualityRoot = createRoot($("#qualityMount"));
-  const renderQuality = (): void => {
-    qualityRoot.render(
-      <ElasticSlider
-        defaultValue={quality}
-        startingValue={1}
-        maxValue={100}
-        isStepped
-        stepSize={1}
-        leftIcon={<>−</>}
-        rightIcon={<>+</>}
-        onChange={(v) => {
-          quality = v;
-        }}
-        onCommit={(v) => {
-          if (v !== getSettings().quality) {
-            updateSettings({ quality: v });
-            showToast("设置已保存");
-          }
-        }}
-      />,
-    );
-  };
-  renderQuality();
+  const qualitySlider = renderElasticSlider($("#qualityMount"), {
+    value: quality,
+    min: 1,
+    max: 100,
+    onChange: (v) => {
+      quality = v;
+    },
+    onCommit: (v) => {
+      if (v !== getSettings().quality) {
+        updateSettings({ quality: v });
+        showToast("设置已保存");
+      }
+    },
+  });
 
   /** 预览基于输入框当前值（未保存也实时），保存后写入设置模型 */
   const updatePreview = (): void => {
@@ -360,7 +349,7 @@ export function renderSettingsView(
     updateSettings({ ...SETTINGS_DEFAULTS });
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     quality = SETTINGS_DEFAULTS.quality;
-    renderQuality();
+    qualitySlider.setValue(quality);
     updatePreview();
     // 连接配置存 Rust config.json，恢复默认时一并清空
     void invoke("set_config", { server: "", apiKey: "" })
@@ -419,7 +408,7 @@ export function renderSettingsView(
         updateSettings(parsed);
         setPath.value = parsed.pathTemplate;
         quality = parsed.quality;
-        renderQuality();
+        qualitySlider.setValue(quality);
         updatePreview();
         lockWorker.exit();
         lockDomain.exit();

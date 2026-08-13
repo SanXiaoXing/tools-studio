@@ -1,8 +1,10 @@
 use std::path::Path;
 
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
 use crate::error::AppError;
+use crate::services::http;
 
 /// 上传成功响应（API.md：PUT /objects/{key}）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,25 +22,16 @@ pub async fn upload_file(
     content_type: &str,
     file_path: &Path,
 ) -> Result<UploadedInfo, AppError> {
-    if server.trim().is_empty() || api_key.trim().is_empty() {
-        return Err(AppError::Config("未配置 Worker 地址或 API Key，请在设置页填写".into()));
-    }
     let body = std::fs::read(file_path).map_err(|e| AppError::Io(format!("读取文件失败: {e}")))?;
-    let url = format!("{}/objects/{}", server.trim_end_matches('/'), key);
-    let client = reqwest::Client::new();
-    let resp = client
-        .put(&url)
-        .header("X-API-Key", api_key)
-        .header("Content-Type", content_type)
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| AppError::Io(format!("请求 Worker 失败: {e}")))?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let text = resp.text().await.unwrap_or_default();
-        return Err(AppError::Io(format!("上传失败 HTTP {status}: {text}")));
-    }
+    let resp = http::request(
+        Method::PUT,
+        server,
+        api_key,
+        &format!("/objects/{key}"),
+        "上传",
+        Some((body, content_type.to_string())),
+    )
+    .await?;
     resp.json::<UploadedInfo>()
         .await
         .map_err(|e| AppError::Io(format!("解析 Worker 响应失败: {e}")))

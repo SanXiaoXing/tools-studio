@@ -5,9 +5,7 @@ import { getSettings } from "../../lib/settings";
 import { buildPath, splitName } from "../../lib/naming";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { createElement } from "react";
-import { createRoot } from "react-dom/client";
-import ConfirmUpload from "./ConfirmUpload";
+import { showConfirmUpload } from "./confirm";
 
 export interface UploadCallbacks {
   /** 单张转换完成，交由主流程入列浏览视图 */
@@ -176,9 +174,7 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     processNext();
   };
 
-  // ---- 二次确认弹窗（React 组件挂载，拖拽与手动选择共用）----
-  const confirmRoot = createRoot(document.body.appendChild(document.createElement("div")));
-
+  // ---- 二次确认弹窗（vanilla，拖拽与手动选择共用）----
   const requestUpload = (paths: string[]): void => {
     const files = paths.filter((p) => /\.(png|jpe?g|webp)$/i.test(p));
     if (files.length === 0) {
@@ -186,19 +182,15 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
       return;
     }
     document.body.style.overflow = "hidden";
-    confirmRoot.render(
-      createElement(ConfirmUpload, {
-        paths: files,
-        onConfirm: (remaining) => {
-          document.body.style.overflow = "";
-          confirmRoot.render(null);
-          addPaths(remaining);
-        },
-        onCancel: () => {
-          document.body.style.overflow = "";
-          confirmRoot.render(null);
-        },
-      }),
+    showConfirmUpload(
+      files,
+      (remaining) => {
+        document.body.style.overflow = "";
+        addPaths(remaining);
+      },
+      () => {
+        document.body.style.overflow = "";
+      },
     );
   };
 

@@ -1,14 +1,12 @@
 import { renderSidebar } from "./app/sidebar";
-import { renderGallery, renderSkeleton } from "./features/gallery/gallery";
+import { renderGallery } from "./features/gallery/gallery";
 import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import type { ImageItem, ViewName } from "./lib/types";
-import { copyText, feedbackCopied, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
+import { copyText, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
+import { icon } from "./lib/icons";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { createElement } from "react";
-import { createRoot } from "react-dom/client";
-import DragMask from "./app/DragMask";
 
 const app = document.querySelector<HTMLElement>("#app")!;
 app.className = "flex h-full";
@@ -80,7 +78,7 @@ const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
 async function copyLink(it: ImageItem, btn?: HTMLButtonElement): Promise<void> {
   const ok = await copyText(formatContent(it));
   if (ok) {
-    if (btn) feedbackCopied(btn);
+    if (btn) feedbackCheck(btn, "已复制");
     showToast("链接已复制到剪贴板");
   } else {
     showToast("复制失败，请手动复制链接");
@@ -135,13 +133,25 @@ renderSettingsView(settingsBody, {
   },
 });
 
-// ---- 全局拖拽遮罩（React 组件挂载）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
-const dragRoot = createRoot(document.body.appendChild(document.createElement("div")));
-let dragVisible = false;
+// ---- 全局拖拽遮罩（vanilla 内联）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
+const dragMask = document.createElement("div");
+dragMask.className = "drag-overlay fixed inset-0 z-50 pointer-events-none";
+dragMask.setAttribute("role", "status");
+dragMask.setAttribute("aria-live", "polite");
+dragMask.hidden = true;
+dragMask.innerHTML = `
+  <div class="absolute inset-4 rounded-xl border-2 border-dashed border-accent/60">
+    <div class="flex h-full flex-col items-center justify-center gap-4">
+      <div class="drag-overlay-icon flex items-center justify-center text-accent">${icon.upload}</div>
+      <div class="text-center">
+        <p class="text-lg font-bold text-white">释放文件以上传图片</p>
+        <p class="mt-1 text-sm text-white/70">自动转换为 WebP 并压缩</p>
+      </div>
+    </div>
+  </div>`;
+document.body.appendChild(dragMask);
 const setDragVisible = (v: boolean): void => {
-  if (dragVisible === v) return;
-  dragVisible = v;
-  dragRoot.render(createElement(DragMask, { isVisible: v }));
+  dragMask.hidden = !v;
 };
 
 void getCurrentWebview().onDragDropEvent((event) => {
@@ -155,6 +165,5 @@ void getCurrentWebview().onDragDropEvent((event) => {
   }
 });
 
-// 首屏骨架屏（模拟加载状态，DESIGN-SPEC §3.8）
-renderSkeleton(galleryBody);
-window.setTimeout(render, 750);
+// 数据同步就绪即渲染（无骨架屏表演）
+render();

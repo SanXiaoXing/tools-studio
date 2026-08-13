@@ -101,7 +101,7 @@ export function createModal(cb: ModalCallbacks): DetailModal {
   const open = (it: ImageItem): void => {
     current = it;
     resetDelete();
-    img.src = imgSrc(it, 1200, 900);
+    img.src = imgSrc(it);
     img.alt = it.name;
     title.textContent = it.name;
     mType.textContent = it.type;

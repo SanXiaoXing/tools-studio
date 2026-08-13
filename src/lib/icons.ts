@@ -1,6 +1,4 @@
-import type { SVGProps } from "react";
-
-/** 图标 path（统一 stroke 1.7，DESIGN-SPEC §8.2）；字符串版与 React 组件版共用同一数据源 */
+/** 图标 path（统一 stroke 1.7，DESIGN-SPEC §8.2） */
 const PATHS = {
   upload: '<path d="M12 15V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a1 1 0 001 1h14a1 1 0 001-1v-2"/>',
   image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5-9 9"/>',
@@ -16,7 +14,7 @@ const PATHS = {
 const svg = (paths: string, size = 18): string =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 
-/** 字符串版图标（innerHTML 模板场景用） */
+/** 图标（innerHTML 模板场景用） */
 export const icon = {
   upload: svg(PATHS.upload, 18),
   image: svg(PATHS.image, 19),
@@ -34,30 +32,3 @@ export const icon = {
     '<rect x="3" y="13" width="8" height="8" rx="2" fill="var(--color-ink3)"/>' +
     '<rect x="13" y="13" width="8" height="8" rx="2" fill="none" stroke="var(--color-ink3)"/></svg>',
 } as const;
-
-export type IconName = keyof typeof icon;
-
-/** React 组件版图标（供 React 组件使用），与字符串版共用 PATHS */
-interface IconProps extends SVGProps<SVGSVGElement> {
-  size?: number;
-}
-
-const Base = ({ size = 18, paths, ...rest }: IconProps & { paths: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-    {...rest}
-    dangerouslySetInnerHTML={{ __html: paths }}
-  />
-);
-
-export const UploadIcon = (props: IconProps) => <Base {...props} paths={PATHS.upload} />;
-export const ImageIcon = (props: IconProps) => <Base size={19} {...props} paths={PATHS.image} />;
-export const XIcon = (props: IconProps) => <Base size={16} {...props} paths={PATHS.x} />;

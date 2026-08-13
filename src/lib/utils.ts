@@ -82,12 +82,8 @@ export const readDims = (url: string, cb: (w: number | null, h: number | null) =
   img.src = url;
 };
 
-/** mock 缩略图（原型演示用；真实上传图走 objectURL） */
-const thumb = (seed: string, w = 640, h = 480): string =>
-  `https://picsum.photos/seed/${seed}/${w}/${h}`;
-
-export const imgSrc = (it: ImageItem, w = 640, h = 480): string =>
-  it.objectURL || thumb(it.seed || it.name, w, h);
+/** 图片地址：上传流每项都带 objectURL（convertFileSrc 本地路径），无需 picsum mock 兜底 */
+export const imgSrc = (it: ImageItem): string => it.objectURL || "";
 
 /** 底部轻提示（单例；浅色深底 / 深色浅底由 CSS 变量自动反转） */
 let toastEl: HTMLElement | null = null;
@@ -139,22 +135,11 @@ export const formatContent = (it: { path: string; name: string; url?: string }):
   return getSettings().copyFormat === "markdown" ? `![${it.name}](${url})` : url;
 };
 
-/** 复制按钮成功反馈：变绿「已复制」（DESIGN-SPEC §6） */
-export const feedbackCopied = (btn: HTMLButtonElement, delay = 1600): void => {
+/** 复制成功反馈：按钮变绿显示 ✓（可附文字标签，如「已复制」），delay 后恢复（DESIGN-SPEC §6） */
+export const feedbackCheck = (btn: HTMLButtonElement, label = "", delay = 1600): void => {
   const old = btn.innerHTML;
   btn.style.background = "var(--color-ok)";
-  btn.innerHTML = icon.check + "已复制";
-  window.setTimeout(() => {
-    btn.style.background = "";
-    btn.innerHTML = old;
-  }, delay);
-};
-
-/** 纯图标按钮成功反馈：变绿显示 ✓（无文字），delay 后恢复（输入框内图标按钮等场景） */
-export const feedbackCheck = (btn: HTMLButtonElement, delay = 1600): void => {
-  const old = btn.innerHTML;
-  btn.style.background = "var(--color-ok)";
-  btn.innerHTML = icon.check;
+  btn.innerHTML = icon.check + label;
   window.setTimeout(() => {
     btn.style.background = "";
     btn.innerHTML = old;

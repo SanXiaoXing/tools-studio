@@ -13,21 +13,6 @@ const GRID_CLS =
   "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 content-start " +
   "p-5 pl-9 pr-9 pb-12 overflow-y-auto h-full";
 
-/** 首屏骨架屏（DESIGN-SPEC §3.8） */
-export function renderSkeleton(container: HTMLElement): void {
-  container.innerHTML = `<div class="${GRID_CLS}">${Array.from(
-    { length: 8 },
-    () => `
-    <div class="bg-surface border border-line rounded-xl p-2.5 shadow-card">
-      <div class="skeleton rounded-lg aspect-[4/3]"></div>
-      <div class="px-1 pt-2.5 space-y-2">
-        <div class="skeleton h-3 rounded-md" style="width:70%"></div>
-        <div class="skeleton h-3 rounded-md" style="width:40%"></div>
-      </div>
-    </div>`,
-  ).join("")}</div>`;
-}
-
 export function renderGallery(container: HTMLElement, items: ImageItem[], cb: GalleryCallbacks): void {
   if (items.length === 0) {
     renderEmpty(container, cb);
