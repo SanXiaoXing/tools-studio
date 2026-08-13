@@ -134,7 +134,7 @@
   50%      { transform: scale(1.07); }
 }
 
-/* 刻度滑块（elasticSlider.ts）：shadcn 风格外观（8px 轨道 + 圆形 thumb + 数值气泡 + 刻度） */
+/* 刻度滑块（elasticSlider.ts）：shadcn 风格外观（8px 轨道 + 数值气泡 + 刻度） */
 .es-body {
   position: relative; /* 为绝对定位的子元素提供定位上下文 */
   padding-top: 30px; /* 给顶部数值气泡留空间 */
