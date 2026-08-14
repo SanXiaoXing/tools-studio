@@ -3,6 +3,7 @@ import { renderGallery } from "./features/gallery/gallery";
 import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
+import { renderDeployView } from "./features/deploy/deployView";
 import type { ImageItem, ViewName } from "./lib/types";
 import { copyText, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
 import { icon } from "./lib/icons";
@@ -46,10 +47,18 @@ const settingsBody = document.createElement("div");
 settingsBody.className = "flex-1 min-h-0 flex flex-col";
 settingsView.appendChild(settingsBody);
 
+const deployView = document.createElement("div");
+deployView.className = VIEW_BASE;
+deployView.innerHTML = headerHTML("部署 Worker", "复制源码与配置，部署你自己的 Cloudflare Worker");
+const deployBody = document.createElement("div");
+deployBody.className = "flex-1 min-h-0 flex flex-col";
+deployView.appendChild(deployBody);
+
 const views: Record<ViewName, HTMLElement> = {
   gallery: galleryView,
   upload: uploadView,
   settings: settingsView,
+  deploy: deployView,
 };
 
 /** 视图切换：隐藏非当前视图，同步导航激活态 */
@@ -137,6 +146,9 @@ renderSettingsView(settingsBody, {
     setStorage(usedBytes);
   },
 });
+
+// 部署 Worker 视图：展示源码/配置 + 复制按钮，用户自行部署（不替用户创建远端资源）
+renderDeployView(deployBody);
 
 // ---- 全局拖拽遮罩（vanilla 内联）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
 const dragMask = document.createElement("div");

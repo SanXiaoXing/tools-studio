@@ -76,6 +76,9 @@ fetch()
 
 ## 5. 完整 Worker 源码
 
+> **部署内容为纯 JavaScript（ESM）**：`apps/worker/src/index.js`，可直接整体粘贴到 Cloudflare 控制台 Worker 编辑器（控制台是 JS 环境，TS 源码无法直接粘贴运行）。
+> 下方 TS 源码为设计稿参考，逻辑与 `index.js` 一致；以 `apps/worker/src/index.js` 为准。
+
 ```ts
 /**
  * Assets Studio Storage Gateway v2

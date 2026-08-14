@@ -1,0 +1,15 @@
+{
+  "name": "assets-studio-worker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Assets Studio Storage Gateway（Cloudflare Worker + R2）",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250801.0",
+    "wrangler": "^3.0.0"
+  }
+}

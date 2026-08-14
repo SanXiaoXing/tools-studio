@@ -47,7 +47,7 @@ export interface QueueItem {
   failStage?: "convert" | "upload";
 }
 
-export type ViewName = "gallery" | "upload" | "settings";
+export type ViewName = "gallery" | "upload" | "settings" | "deploy";
 
 /** 存储统计响应（WORKER-V2.md §7.4：sync_usage 命令透传 Worker /usage） */
 export interface UsageInfo {

@@ -9,6 +9,7 @@ const PATHS = {
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M10 11v6M14 11v6"/>',
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
 } as const;
 
 const svg = (paths: string, size = 18): string =>
@@ -25,4 +26,5 @@ export const icon = {
   eye: svg(PATHS.eye, 16),
   trash: svg(PATHS.trash, 16),
   x: svg(PATHS.x, 16),
+  code: svg(PATHS.code, 18),
 } as const;
