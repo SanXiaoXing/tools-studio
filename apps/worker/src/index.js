@@ -3,10 +3,10 @@
  * 契约：docs/API.md；职责：仅对象存储（DECISIONS.md D-007），不做图片消费。
  *
  * 双域名架构（API 与图片分离）：
- *   API 域名（Worker）：https://img-service.sanxiaoxing.cn 或 https://xxx.workers.dev
+ *   API 域名（Worker）：https://xxx.workers.dev
  *     负责 PUT / DELETE / HEAD /objects、GET /objects、GET /usage、POST /usage/rescan，
  *     所有请求必须带 X-API-Key 或 Authorization: Bearer。
- *   图片域名（R2 自定义域 / Public Bucket）：https://img.sanxiaoxing.cn
+ *   图片域名（R2 自定义域 / Public Bucket）
  *     图片读取由 R2 直接提供，不经过本 Worker，因此不需要 API Key。
  *     上传响应的 url = 「图片域名 + key」，别人可直接打开看图，但不能调用本 API。
  *
