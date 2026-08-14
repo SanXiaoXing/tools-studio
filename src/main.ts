@@ -4,21 +4,20 @@ import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import { renderDeployView } from "./features/deploy/deployView";
-import type { ImageItem, ObjectItem, ObjectList, UsageInfo, ViewName } from "./lib/types";
-import {
-  basename,
-  copyText,
-  errorMessage,
-  feedbackCheck,
-  formatBytes,
-  formatContent,
-  pad2,
-  parseSizeToBytes,
-  showToast,
-} from "./lib/utils";
+import type { ImageItem, ObjectItem, ObjectList, ViewName } from "./lib/types";
+import { basename, formatBytes, pad2 } from "./lib/utils";
 import { icon } from "./lib/icons";
 import { getSettings } from "./lib/settings";
 import { applyTheme } from "./lib/theme";
+import {
+  copyLink,
+  getItems,
+  getUsedBytes,
+  refreshCloudUsage,
+  removeItem,
+  setItems,
+  subscribe,
+} from "./lib/store";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -96,23 +95,7 @@ app.appendChild(content);
 for (const v of Object.keys(views) as ViewName[]) content.appendChild(views[v]);
 switchView("gallery"); // 初始视图：隐藏其余视图并高亮导航
 
-/** 初始为空：首屏不预置任何图片，展示空状态，真实数据来自上传流程 */
-let items: ImageItem[] = [];
 const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
-
-/** 云端真实存储用量（GET /usage，WORKER-V2.md §7.4）：优先显示，本地估算仅作兜底 */
-let cloudUsage: number | null = null;
-
-/** 从云端拉取 R2 真实统计并刷新侧边栏「已用空间」；失败时静默保留当前显示（本地估算兜底） */
-async function refreshCloudUsage(): Promise<void> {
-  try {
-    const u = await invoke<UsageInfo>("sync_usage", { rescan: false });
-    cloudUsage = u.size;
-    setStorage(u.size);
-  } catch {
-    /* 云端不可用时保持现有显示，不打扰用户 */
-  }
-}
 
 /** ISO 时间 → "YYYY-MM-DD HH:mm"（本地时区），与上传列表日期格式一致 */
 function formatCloudDate(iso: string): string {
@@ -162,38 +145,10 @@ async function loadCloudGallery(): Promise<void> {
       cursor = page.has_more ? page.cursor : null;
     } while (cursor);
     // R2 列表按 key 升序（即时间正序）；倒序让最新图片排最前，与上传流程一致
-    items = all.reverse().map(cloudItemToImageItem);
-    render();
+    setItems(all.reverse().map(cloudItemToImageItem));
   } catch {
     /* 未配置 Worker 或拉取失败：保持空状态，不打扰 */
   }
-}
-
-async function copyLink(it: ImageItem, btn?: HTMLButtonElement): Promise<void> {
-  const ok = await copyText(formatContent(it));
-  if (ok) {
-    if (btn) feedbackCheck(btn, "已复制");
-    showToast("链接已复制到剪贴板");
-  } else {
-    showToast("复制失败，请手动复制链接");
-  }
-}
-
-/** 删除图片：先删除远程 R2 对象（DELETE /objects/{key}），成功后才从本地列表移除。
- *  远程删除失败时保留本地项并提示，避免「本地已删、远程残留」的脏数据（API.md §5）。 */
-async function removeItem(it: ImageItem): Promise<void> {
-  if (it.path) {
-    try {
-      await invoke("delete_image", { key: it.path });
-    } catch (e) {
-      showToast(`远程删除失败：${errorMessage(e)}`);
-      return;
-    }
-  }
-  items = items.filter((x) => x !== it);
-  render();
-  void refreshCloudUsage(); // 删除后同步云端统计（Worker 已 -1）
-  showToast(`已删除 ${it.name}`);
 }
 
 const modal = createModal({
@@ -203,41 +158,23 @@ const modal = createModal({
   onConfirmDelete: removeItem,
 });
 
+/** 重绘：状态来自 store（订阅触发），侧边栏已用空间用云端真实统计或本地累加兜底 */
 function render(): void {
+  const items = getItems();
   renderGallery(galleryBody, items, {
-    onCopy: (it, btn) => {
-      void copyLink(it, btn);
-    },
     onDetail: (it) => modal.open(it),
-    onConfirmDelete: removeItem,
     onEmptyUpload: () => switchView("upload"),
   });
   navCount.textContent = String(items.length);
   gallerySub.textContent =
     items.length === 0 ? "还没有图片，去上传页添加吧" : `共 ${items.length} 张图片，点击图片查看详情`;
-  // 已用空间：优先显示云端 R2 真实统计（含历史图片）；未拉取到云端时用本地图片累加兜底
-  const usedBytes = cloudUsage ?? items.reduce((sum, it) => sum + parseSizeToBytes(it.size), 0);
-  setStorage(usedBytes);
+  setStorage(getUsedBytes());
 }
 
-const uploadApi: UploadApi = renderUploadView(uploadBody, {
-  onUploaded: (it) => {
-    items = [it].concat(items);
-    render();
-    void refreshCloudUsage(); // 上传后同步云端统计（Worker 已 +1，含全部历史图片）
-    showToast(`上传完成：${it.name}`);
-  },
-  onQueueCopy: (q, btn) => {
-    void copyLink({ name: q.name, path: q.path ?? "" } as ImageItem, btn);
-  },
-});
-// 存储用量：设置页手动刷新（WORKER-V2.md §8）时同步侧边栏为云端真实统计；
+const uploadApi: UploadApi = renderUploadView(uploadBody);
+// 存储用量：设置页手动刷新（WORKER-V2.md §8）时直接写入 store，订阅触发侧边栏同步；
 // 「部署 Worker」入口：跳转到部署页面（侧边栏已移除该导航）
 renderSettingsView(settingsBody, {
-  onUsageResolved: (usedBytes) => {
-    cloudUsage = usedBytes;
-    setStorage(usedBytes);
-  },
   onOpenDeploy: () => switchView("deploy"),
 });
 
@@ -280,6 +217,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
 });
 
 // 数据同步就绪即渲染（无骨架屏表演）；启动即拉取云端真实用量与历史图片列表（本地 items 为空）
+subscribe(render);
 render();
 void refreshCloudUsage();
 void loadCloudGallery();

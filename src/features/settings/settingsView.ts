@@ -5,6 +5,7 @@ import { renderSlidingSeg } from "../../lib/seg";
 import { fillTemplate } from "../../lib/naming";
 import { icon } from "../../lib/icons";
 import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
+import { setCloudUsage } from "../../lib/store";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { renderElasticSlider } from "./elasticSlider";
@@ -89,11 +90,11 @@ function lockSection(section: HTMLElement, fields: LockField[], onSave: (values:
 }
 
 /** 设置视图（DESIGN-SPEC §3.4）：Worker/域名等一次性设置只读锁定，路径模板 / 压缩质量实时预览。
- *  onUsageResolved：存储统计拉取成功后回调（字节数），供外部（main.ts）刷新侧边栏已用空间。
+ *  存储统计拉取成功后直接写入 store（setCloudUsage），由订阅触发侧边栏「已用空间」刷新。
  *  onOpenDeploy：点击「部署 Worker」入口时回调，跳转到部署页面。 */
 export function renderSettingsView(
   container: HTMLElement,
-  opts?: { onUsageResolved?: (usedBytes: number) => void; onOpenDeploy?: () => void },
+  opts?: { onOpenDeploy?: () => void },
 ): void {
   const cur = getSettings();
   container.innerHTML = `
@@ -484,7 +485,7 @@ export function renderSettingsView(
     void invoke<UsageInfo>("sync_usage", { rescan })
       .then((u) => {
         usageText.textContent = `${u.sizeFormatted}（${u.objects} 张）`;
-        opts?.onUsageResolved?.(u.size);
+        setCloudUsage(u.size);
         showToast(rescan ? "重新统计完成" : "已刷新统计");
       })
       .catch((e) => {

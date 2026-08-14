@@ -1,6 +1,16 @@
 use reqwest::Method;
+use std::sync::OnceLock;
 
 use crate::error::AppError;
+
+/// 全局 HTTP 客户端单例（模块作用域持久化）：reqwest::Client 内部维护连接池 /
+/// keepalive / DNS 缓存，官方建议复用而非每次请求 `Client::new()`。
+/// ponytail: 进程级单例，配置不运行时调整（Agent 字段目前无需自定义）。
+static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn client() -> &'static reqwest::Client {
+    HTTP.get_or_init(reqwest::Client::new)
+}
 
 /// 发送带 X-API-Key 的 Worker 请求并校验状态码。
 /// `path` 为 URL 路径（如 `/objects/{key}`、`/usage`）；`body` 为 (字节, Content-Type)，仅上传类请求传入。
@@ -17,8 +27,7 @@ pub async fn request(
         return Err(AppError::Config("未配置 Worker 地址或 API Key，请在设置页填写".into()));
     }
     let url = format!("{}{}", server.trim_end_matches('/'), path);
-    let client = reqwest::Client::new();
-    let mut req = client.request(method, &url).header("X-API-Key", api_key);
+    let mut req = client().request(method, &url).header("X-API-Key", api_key);
     if let Some((bytes, content_type)) = body {
         req = req.header("Content-Type", content_type).body(bytes);
     }

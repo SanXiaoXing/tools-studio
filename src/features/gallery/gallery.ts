@@ -1,11 +1,10 @@
 import type { ImageItem } from "../../lib/types";
 import { esc, imgSrc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
+import { copyLink, removeItem } from "../../lib/store";
 
 export interface GalleryCallbacks {
-  onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
   onDetail: (it: ImageItem) => void;
-  onConfirmDelete: (it: ImageItem) => void;
   onEmptyUpload: () => void;
 }
 
@@ -71,13 +70,13 @@ function onClick(e: MouseEvent, items: ImageItem[], cb: GalleryCallbacks): void 
     const act = btn.getAttribute("data-act");
     const actions = card.querySelector<HTMLElement>(".ov-actions");
     const confirm = card.querySelector<HTMLElement>(".ov-confirm");
-    if (act === "copy") cb.onCopy(it, btn);
+    if (act === "copy") void copyLink(it, btn);
     if (act === "detail") cb.onDetail(it);
     if (act === "delete" && actions && confirm) {
       actions.hidden = true;
       confirm.hidden = false;
     }
-    if (act === "confirm") cb.onConfirmDelete(it);
+    if (act === "confirm") void removeItem(it);
     if (act === "cancel") cancelConfirm(card);
     return;
   }

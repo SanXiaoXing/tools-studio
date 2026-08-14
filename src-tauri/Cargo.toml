@@ -28,3 +28,6 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 webp = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-window-state = "2.4.1"
+

@@ -1,17 +1,12 @@
-import type { ImageItem, QueueItem } from "../../lib/types";
+import type { QueueItem } from "../../lib/types";
 import { basename, errorMessage, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings } from "../../lib/settings";
 import { buildPath, sanitizeName, splitName } from "../../lib/naming";
+import { addItem, copyLink, refreshCloudUsage } from "../../lib/store";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { showConfirmUpload } from "./confirm";
-
-export interface UploadCallbacks {
-  /** 单张转换完成，交由主流程入列浏览视图 */
-  onUploaded: (it: ImageItem) => void;
-  onQueueCopy: (q: QueueItem, btn: HTMLButtonElement) => void;
-}
 
 /** renderUploadView 返回值：供外部（全局拖拽）发起带二次确认的上传 */
 export interface UploadApi {
@@ -24,7 +19,7 @@ const readDimsAsync = (url: string): Promise<string> =>
     readDims(url, (w, h) => resolve(w && h ? `${w} × ${h}` : "未知"));
   });
 
-export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): UploadApi {
+export function renderUploadView(container: HTMLElement): UploadApi {
   const queue: QueueItem[] = [];
   let total = 0;
   let done = 0;
@@ -80,7 +75,7 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     const outUrl = convertFileSrc(outPath);
     readDimsAsync(outUrl).then((dims) => {
       q.dims = dims;
-      cb.onUploaded({
+      addItem({
         name: newName,
         type: "WEBP",
         size: q.sizeAfter,
@@ -90,6 +85,8 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
         url,
         path: q.path ?? "",
       });
+      void refreshCloudUsage(); // 上传后同步云端统计（Worker 已 +1，含全部历史图片）
+      showToast(`上传完成：${newName}`);
     });
     renderQueue();
   };
@@ -212,7 +209,7 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
     if (!btn) return;
     const row = btn.closest<HTMLElement>("[data-i]");
     const q = queue[Number(row?.getAttribute("data-i"))];
-    if (q && q.done) cb.onQueueCopy(q, btn);
+    if (q && q.done) void copyLink({ name: q.name, path: q.path ?? "" }, btn);
   });
 
   return { requestUpload };
