@@ -24,6 +24,8 @@ export interface Settings {
   quality: number;
   /** 主题模式：跟随系统 / 深色 / 浅色 */
   theme: "system" | "dark" | "light";
+  /** 存储文件名策略：auto=自动命名（时间戳+序号），original=保留图片原文件名 */
+  nameMode: "auto" | "original";
 }
 
 /** 上传队列项 */

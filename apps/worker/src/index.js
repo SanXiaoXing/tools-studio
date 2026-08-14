@@ -58,7 +58,8 @@ const EXT_MIME = {
   avif: "image/avif",
 };
 
-const KEY_PATTERN = /^[a-zA-Z0-9._/-]+$/;
+/** 允许 Unicode 字母/数字 + `._/-`（支持中文等原文件名，如 我的图片.webp） */
+const KEY_PATTERN = /^[\p{L}\p{N}._/-]+$/u;
 const MAX_KEY_LEN = 1024;
 
 /** 统计元对象 key：固定前缀，list 时排除，避免混入用户图片 */

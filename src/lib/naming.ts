@@ -30,3 +30,18 @@ export const splitName = (name: string): { base: string; ext: string } => {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? { base: name.slice(0, dot), ext: name.slice(dot + 1) } : { base: name, ext: "" };
 };
+
+/**
+ * 清洗文件名使其可用于 R2 key：
+ * - 保留中文等 Unicode 字符（Worker 已支持）
+ * - 非法字符（空格、引号、尖括号等）替换为 `-`
+ * - 折叠连续 `-`、去掉首尾 `-` / `.`
+ * 空结果回退 "image"（防止 key 为空导致上传失败）。
+ */
+export const sanitizeName = (name: string): string => {
+  const cleaned = name
+    .replace(/[^\p{L}\p{N}._-]/gu, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[.-]+|[.-]+$/g, "");
+  return cleaned || "image";
+};

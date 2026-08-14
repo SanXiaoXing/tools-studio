@@ -2,7 +2,7 @@ import type { ImageItem, QueueItem } from "../../lib/types";
 import { basename, errorMessage, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings } from "../../lib/settings";
-import { buildPath, splitName } from "../../lib/naming";
+import { buildPath, sanitizeName, splitName } from "../../lib/naming";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { showConfirmUpload } from "./confirm";
@@ -118,8 +118,10 @@ export function renderUploadView(container: HTMLElement, cb: UploadCallbacks): U
           q.pct = 80;
           updateRow(q);
           // 生成 R2 key（模板）并上传到 Worker → R2；server/apiKey 由 Rust 从 config.json 读取（WORKER-V2.md §7）
+          // 文件名先清洗：保留原文件名（nameMode=original 时模板 {name} 生效），非法字符替换为 -（naming.ts sanitizeName）
           const { base } = splitName(q.name);
-          const path = buildPath(base, "webp", undefined, ++seq);
+          const safeBase = sanitizeName(base);
+          const path = buildPath(safeBase, "webp", undefined, ++seq);
           q.path = path;
           // Tauri v2 命令参数：JS 端用驼峰命名（自动转 Rust 蛇形参数），
           // 必须用 contentType / filePath，不能写 content_type / file_path，否则报 invalid args。

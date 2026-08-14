@@ -7,6 +7,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   copyFormat: "url",
   quality: 80,
   theme: "system",
+  nameMode: "auto",
 };
 
 let settings: Settings = load();
@@ -43,6 +44,7 @@ export const parseSettingsBackup = (raw: string): Settings | null => {
     if (merged.copyFormat !== "url" && merged.copyFormat !== "markdown") return null;
     if (typeof merged.quality !== "number" || merged.quality < 1 || merged.quality > 100) return null;
     if (merged.theme !== "system" && merged.theme !== "dark" && merged.theme !== "light") return null;
+    if (merged.nameMode !== "auto" && merged.nameMode !== "original") return null;
     return merged;
   } catch {
     return null;

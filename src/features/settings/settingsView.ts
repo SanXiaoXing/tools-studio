@@ -1,6 +1,7 @@
 import type { UsageInfo } from "../../lib/types";
 import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { renderThemeSeg } from "../../lib/theme";
+import { renderSlidingSeg } from "../../lib/seg";
 import { fillTemplate } from "../../lib/naming";
 import { icon } from "../../lib/icons";
 import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
@@ -170,6 +171,11 @@ export function renderSettingsView(
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
         <h2 class="text-[15px] font-bold mb-1">存储路径</h2>
         <p class="text-xs text-ink3 leading-relaxed mb-4.5">图片按上传日期自动归档到当月目录，月份随日期自动切换，无需手动迁移旧图。</p>
+        <div>
+          <label class="block text-[13px] font-medium mb-1.5">命名方式</label>
+          <div id="nameModeMount"></div>
+          <p class="${HINT_CLS}">自动命名生成「时间戳+序号」；保留原文件名则直接用图片原名（特殊字符自动替换为 <code class="${CODE_CLS}">-</code>）。</p>
+        </div>
         <div>
           <label for="setPath" class="block text-[13px] font-medium mb-1.5">路径模板</label>
           <input id="setPath" spellcheck="false" autocomplete="off" class="${INPUT_CLS}">
@@ -360,6 +366,7 @@ export function renderSettingsView(
     updateSettings({ ...SETTINGS_DEFAULTS });
     themeSeg.setTheme(SETTINGS_DEFAULTS.theme);
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
+    nameSeg.setValue(SETTINGS_DEFAULTS.nameMode, { silent: true });
     quality = SETTINGS_DEFAULTS.quality;
     qualitySlider.setValue(quality);
     updatePreview();
@@ -374,6 +381,28 @@ export function renderSettingsView(
     showToast("已恢复默认设置");
   });
   setPath.addEventListener("input", updatePreview);
+
+  /** 命名方式：自动命名（时间戳+序号）/ 保留原文件名（预设模板，保存后对新上传生效）。
+   *  滑动动画与主题切换共用 renderSlidingSeg（seg.ts），交互一致。 */
+  type NameMode = "auto" | "original";
+  const NAME_MODE_PRESETS: Record<NameMode, string> = {
+    auto: SETTINGS_DEFAULTS.pathTemplate,
+    original: "blog/{YYYY}/{MM}/{name}.{ext}",
+  };
+  const nameSeg = renderSlidingSeg<NameMode>($<HTMLElement>("#nameModeMount"), {
+    options: [
+      { value: "auto", label: "自动命名" },
+      { value: "original", label: "原文件名" },
+    ],
+    value: getSettings().nameMode,
+    size: "sm", // 比主题切换更紧凑
+    onChange: (mode) => {
+      updateSettings({ nameMode: mode, pathTemplate: NAME_MODE_PRESETS[mode] });
+      setPath.value = NAME_MODE_PRESETS[mode];
+      updatePreview();
+      showToast(mode === "original" ? "已切换为保留原文件名" : "已切换为自动命名");
+    },
+  });
 
   /** 备份与恢复：导出当前设置为 JSON 文件，从备份文件一键恢复（含一次性设置） */
   const exportBtn = $<HTMLButtonElement>("#exportBackup");
@@ -420,6 +449,7 @@ export function renderSettingsView(
         updateSettings(parsed);
         themeSeg.setTheme(parsed.theme);
         setPath.value = parsed.pathTemplate;
+        nameSeg.setValue(parsed.nameMode, { silent: true });
         quality = parsed.quality;
         qualitySlider.setValue(quality);
         updatePreview();
