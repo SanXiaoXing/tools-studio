@@ -86,7 +86,7 @@ fetch()
  *
  * 环境变量：
  *   API_KEY         必填，共享密钥（wrangler secret put API_KEY）
- *   PUBLIC_BASE_URL 必填，R2 自定义域名，如 https://img.sanxiaoxing.cn
+ *   PUBLIC_BASE_URL 必填，R2 自定义域名，如 https://img.example.com
  *   ALLOWED_TYPES   可选，逗号分隔的 Content-Type 白名单（默认内置图片五类）
  *   MAX_SIZE_MB     可选，单文件上限 MB（默认 20，与前端"单张不超过 20 MB"一致）
  *
@@ -466,7 +466,7 @@ binding = "IMAGES"
 bucket_name = "your-bucket"
 
 [vars]
-PUBLIC_BASE_URL = "https://img.sanxiaoxing.cn"
+PUBLIC_BASE_URL = "https://img.example.com"
 ALLOWED_TYPES = "image/png,image/jpeg,image/webp,image/gif,image/avif"
 MAX_SIZE_MB = "20"
 ```
