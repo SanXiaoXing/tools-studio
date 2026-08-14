@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use crate::config;
 use crate::error::AppError;
 use crate::services::compress;
+use crate::services::delete;
 use crate::services::upload;
 use crate::services::usage;
 
@@ -53,6 +54,14 @@ pub async fn upload_image(
 pub async fn sync_usage(rescan: bool) -> Result<usage::UsageInfo, AppError> {
     let cfg = config::load()?;
     usage::fetch_usage(&cfg.server, &cfg.api_key, rescan).await
+}
+
+/// 删除 R2 中的图片（API.md §5：DELETE /objects/{key}）。
+/// server / apiKey 从 config.json 内部读取；对象不存在（404）视为已删除，不报错。
+#[tauri::command]
+pub async fn delete_image(key: String) -> Result<(), AppError> {
+    let cfg = config::load()?;
+    delete::delete_file(&cfg.server, &cfg.api_key, &key).await
 }
 
 /// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）

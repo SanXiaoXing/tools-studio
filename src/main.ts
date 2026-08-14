@@ -5,11 +5,12 @@ import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import { renderDeployView } from "./features/deploy/deployView";
 import type { ImageItem, ViewName } from "./lib/types";
-import { copyText, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
+import { copyText, errorMessage, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
 import { icon } from "./lib/icons";
 import { getSettings } from "./lib/settings";
 import { applyTheme } from "./lib/theme";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { invoke } from "@tauri-apps/api/core";
 
 // 启动即应用主题（data-theme 驱动 CSS 变量；system 模式由 settings.ts 监听实时跟随）
 applyTheme(getSettings().theme);
@@ -99,7 +100,17 @@ async function copyLink(it: ImageItem, btn?: HTMLButtonElement): Promise<void> {
   }
 }
 
-function removeItem(it: ImageItem): void {
+/** 删除图片：先删除远程 R2 对象（DELETE /objects/{key}），成功后才从本地列表移除。
+ *  远程删除失败时保留本地项并提示，避免「本地已删、远程残留」的脏数据（API.md §5）。 */
+async function removeItem(it: ImageItem): Promise<void> {
+  if (it.path) {
+    try {
+      await invoke("delete_image", { key: it.path });
+    } catch (e) {
+      showToast(`远程删除失败：${errorMessage(e)}`);
+      return;
+    }
+  }
   items = items.filter((x) => x !== it);
   render();
   showToast(`已删除 ${it.name}`);

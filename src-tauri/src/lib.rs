@@ -14,6 +14,7 @@ pub fn run() {
             commands::convert_to_webp,
             commands::upload_image,
             commands::sync_usage,
+            commands::delete_image,
             commands::export_settings,
             commands::import_settings
         ])

@@ -1,7 +1,26 @@
 /**
+ * Assets Studio Storage Gateway v2
+ * 契约：docs/API.md；职责：仅对象存储（DECISIONS.md D-007），不做图片消费。
+ *
+ * 双域名架构（API 与图片分离）：
+ *   API 域名（Worker）：https://img-service.sanxiaoxing.cn 或 https://xxx.workers.dev
+ *     负责 PUT / DELETE / HEAD /objects、GET /objects、GET /usage、POST /usage/rescan，
+ *     所有请求必须带 X-API-Key 或 Authorization: Bearer。
+ *   图片域名（R2 自定义域 / Public Bucket）：https://img.sanxiaoxing.cn
+ *     图片读取由 R2 直接提供，不经过本 Worker，因此不需要 API Key。
+ *     上传响应的 url = 「图片域名 + key」，别人可直接打开看图，但不能调用本 API。
+ *
+ * 部署（零配置，纯控制台操作，无需安装/运行任何命令行工具）：
+ *   1. 创建 R2 存储桶，并添加自定义域名（R2 → 桶 → 设置 → 自定义域）用于公开读取图片
+ *   2. Cloudflare 控制台（dash.cloudflare.com）→ Workers & Pages → 创建 Worker → 编辑代码
+ *   3. 全选删除模板代码，粘贴本文件全部内容，点「部署」
+ *   4. Worker「设置 → 变量和机密」添加下方环境变量（API_KEY 类型选「机密」）
+ *   5. Worker「设置 → 绑定」添加 R2 存储桶绑定，绑定名称填 IMAGES
+ *
  * 环境变量（在 Cloudflare 控制台填写，本文件不包含密钥值）：
  *   API_KEY         必填，共享密钥，与客户端设置页 API Key 一致（存为 Secret）
- *   PUBLIC_BASE_URL 必填，R2 自定义域名，如 https://img.sanxiaoxing.cn
+ *   PUBLIC_BASE_URL 必填，图片域名（R2 自定义域），如 https://img.sanxiaoxing.cn，结尾无斜杠；
+ *                   注意：不是 API 域名（img-service.sanxiaoxing.cn）
  *   ALLOWED_TYPES   可选，逗号分隔的 Content-Type 白名单（默认内置图片五类）
  *   MAX_SIZE_MB     可选，单文件上限 MB（默认 20，与前端"单张不超过 20 MB"一致）
  *
@@ -15,7 +34,7 @@
  * @typedef {Object} Env
  * @property {R2Bucket} IMAGES - R2 存储桶绑定
  * @property {string} API_KEY - 共享密钥
- * @property {string} PUBLIC_BASE_URL - 图片访问域名（结尾无斜杠）
+ * @property {string} PUBLIC_BASE_URL - 图片域名（R2 自定义域，非 API 域名，结尾无斜杠）
  * @property {string} [ALLOWED_TYPES] - Content-Type 白名单（逗号分隔）
  * @property {string} [MAX_SIZE_MB] - 单文件上限 MB
  */
