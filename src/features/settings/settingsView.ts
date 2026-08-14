@@ -89,15 +89,26 @@ function lockSection(section: HTMLElement, fields: LockField[], onSave: (values:
 }
 
 /** 设置视图（DESIGN-SPEC §3.4）：Worker/域名等一次性设置只读锁定，路径模板 / 压缩质量实时预览。
- *  onUsageResolved：存储统计拉取成功后回调（字节数），供外部（main.ts）刷新侧边栏已用空间。 */
+ *  onUsageResolved：存储统计拉取成功后回调（字节数），供外部（main.ts）刷新侧边栏已用空间。
+ *  onOpenDeploy：点击「部署 Worker」入口时回调，跳转到部署页面。 */
 export function renderSettingsView(
   container: HTMLElement,
-  opts?: { onUsageResolved?: (usedBytes: number) => void },
+  opts?: { onUsageResolved?: (usedBytes: number) => void; onOpenDeploy?: () => void },
 ): void {
   const cur = getSettings();
   container.innerHTML = `
   <div class="settings-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
     <div class="flex flex-col gap-4">
+
+      <section class="bg-surface border border-line rounded-xl shadow-card p-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="text-[15px] font-bold mb-1">部署 Worker</h2>
+            <p class="text-xs text-ink3 leading-relaxed">复制源码粘贴到 Cloudflare 控制台，自行部署 Storage Gateway（上传 / 删除 / 统计）。</p>
+          </div>
+          <button id="openDeploy" type="button" class="${PRIMARY_BTN_CLS} shrink-0">去部署 ${icon.arrow}</button>
+        </div>
+      </section>
 
       <section id="lockWorker" class="bg-surface border border-line rounded-xl shadow-card p-5">
         <div class="flex items-center justify-between gap-3 mb-1">
@@ -239,6 +250,9 @@ export function renderSettingsView(
   const setPath = $<HTMLInputElement>("#setPath");
   const pathPreview = $<HTMLElement>("#pathPreview");
   const resetBtn = $<HTMLButtonElement>("#resetSettings");
+
+  // 「部署 Worker」入口：跳转到部署页面（侧边栏已移除该导航，收进设置页内）
+  $<HTMLButtonElement>("#openDeploy").addEventListener("click", () => opts?.onOpenDeploy?.());
 
   /** Worker 连接信息：存 Rust config.json（WORKER-V2.md §7），前端只做展示与透传，不落 localStorage */
   let conn = { server: "", apiKey: "" };

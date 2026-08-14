@@ -7,7 +7,6 @@ import { formatBytes } from "../lib/utils";
 const NAV: Array<{ view: ViewName; label: string; icon: string }> = [
   { view: "gallery", label: "浏览图片", icon: icon.image },
   { view: "settings", label: "设置", icon: icon.sliders },
-  { view: "deploy", label: "部署 Worker", icon: icon.code },
 ];
 
 const COLLAPSE_KEY = "as-collapsed";

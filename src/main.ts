@@ -231,16 +231,21 @@ const uploadApi: UploadApi = renderUploadView(uploadBody, {
     void copyLink({ name: q.name, path: q.path ?? "" } as ImageItem, btn);
   },
 });
-// 存储用量：设置页手动刷新（WORKER-V2.md §8）时同步侧边栏为云端真实统计
+// 存储用量：设置页手动刷新（WORKER-V2.md §8）时同步侧边栏为云端真实统计；
+// 「部署 Worker」入口：跳转到部署页面（侧边栏已移除该导航）
 renderSettingsView(settingsBody, {
   onUsageResolved: (usedBytes) => {
     cloudUsage = usedBytes;
     setStorage(usedBytes);
   },
+  onOpenDeploy: () => switchView("deploy"),
 });
 
-// 部署 Worker 视图：展示源码/配置 + 复制按钮，用户自行部署（不替用户创建远端资源）
-renderDeployView(deployBody);
+// 部署 Worker 视图：展示源码/配置 + 复制按钮，用户自行部署（不替用户创建远端资源）；
+// 「返回设置」按钮回到设置页（从设置页入口进入，侧边栏无独立导航）
+renderDeployView(deployBody, {
+  onBack: () => switchView("settings"),
+});
 
 // ---- 全局拖拽遮罩（vanilla 内联）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
 const dragMask = document.createElement("div");

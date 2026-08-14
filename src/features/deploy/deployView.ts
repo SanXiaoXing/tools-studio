@@ -33,10 +33,18 @@ const domainRow = (api: string, img: string): string => `
     </div>
   </div>`;
 
-/** 部署 Worker 视图（侧边栏「部署 Worker」入口） */
-export function renderDeployView(container: HTMLElement): void {
+/** 部署 Worker 视图（从设置页「部署 Worker」入口进入，侧边栏已无独立导航） */
+export function renderDeployView(
+  container: HTMLElement,
+  opts?: { onBack?: () => void },
+): void {
   container.innerHTML = `
   <div class="settings-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
+    <div class="flex items-center">
+      <button id="backToSettings" type="button" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 border border-line bg-surface text-ink2 text-xs font-medium hover:bg-surface3 hover:text-ink transition">
+        ${icon.arrow} 返回设置
+      </button>
+    </div>
     <div class="flex flex-col gap-4">
 
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
@@ -45,7 +53,7 @@ export function renderDeployView(container: HTMLElement): void {
           Worker 只负责带鉴权的 API（上传 / 删除 / 列表 / 统计），图片读取由 <strong class="text-ink2">R2 自定义域名</strong>直接提供，
           不经过 Worker、不需要 API Key。这样别人能看图，但不能利用你的 Worker 上传。部署时请准备两个域名：
         </p>
-        ${domainRow("img-service.sanxiaoxing.cn", "img.sanxiaoxing.cn")}
+        ${domainRow("api.example.com", "img.example.com")}
         <div class="flex flex-col gap-2 mt-3.5">
           <div class="flex items-start gap-2 text-xs text-ink2 leading-relaxed">
             <span class="shrink-0 w-4 h-4 mt-0.5 rounded bg-accent-soft text-accent text-[10px] font-bold flex items-center justify-center">A</span>
@@ -66,7 +74,7 @@ export function renderDeployView(container: HTMLElement): void {
         </p>
         <ol class="flex flex-col gap-2.5">
           ${step(1, `创建 R2 存储桶：R2 →「创建存储桶」（如 <code class="${CODE_CLS}">tools-studio</code>）。`)}
-          ${step(2, `给存储桶添加自定义域名：R2 → 存储桶 →「设置」→「自定义域」→ 添加图片域名（如 <code class="${CODE_CLS}">img.sanxiaoxing.cn</code>），状态变为 <code class="${CODE_CLS}">Active</code> 后图片可公开读取。`)}
+          ${step(2, `给存储桶添加自定义域名：R2 → 存储桶 →「设置」→「自定义域」→ 添加图片域名（如 <code class="${CODE_CLS}">img.example.com</code>），状态变为 <code class="${CODE_CLS}">Active</code> 后图片可公开读取。`)}
           ${step(3, `创建 Worker：<code class="${CODE_CLS}">dash.cloudflare.com</code> → Workers & Pages →「创建 Worker」（模板选 Hello World）→「编辑代码」。`)}
           ${step(4, `全选删除模板代码，点下方「复制源码」粘贴进去，然后点右上角「部署」。`)}
           ${step(5, `进入「设置 → 变量和机密」添加下方 4 个环境变量（<code class="${CODE_CLS}">API_KEY</code> 类型选「机密」）。`)}
@@ -102,7 +110,7 @@ export function renderDeployView(container: HTMLElement): void {
             </thead>
             <tbody class="text-ink2 divide-y divide-line">
               <tr><td class="px-3 py-2 font-mono text-ink">API_KEY</td><td class="px-3 py-2">是</td><td class="px-3 py-2">访问密钥，与设置页 API Key 一致（类型选「机密」）</td></tr>
-              <tr><td class="px-3 py-2 font-mono text-ink">PUBLIC_BASE_URL</td><td class="px-3 py-2">是</td><td class="px-3 py-2"><strong class="text-ink">图片域名</strong>（R2 自定义域，如 https://img.sanxiaoxing.cn，结尾无斜杠），不是 API 域名</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-ink">PUBLIC_BASE_URL</td><td class="px-3 py-2">是</td><td class="px-3 py-2"><strong class="text-ink">图片域名</strong>（R2 自定义域，如 https://img.example.com，结尾无斜杠），不是 API 域名</td></tr>
               <tr><td class="px-3 py-2 font-mono text-ink">ALLOWED_TYPES</td><td class="px-3 py-2">否</td><td class="px-3 py-2">Content-Type 白名单，默认 image/png,image/jpeg,image/webp,image/gif,image/avif</td></tr>
               <tr><td class="px-3 py-2 font-mono text-ink">MAX_SIZE_MB</td><td class="px-3 py-2">否</td><td class="px-3 py-2">单文件上限（MB），默认 20</td></tr>
             </tbody>
@@ -113,6 +121,9 @@ export function renderDeployView(container: HTMLElement): void {
 
     </div>
   </div>`;
+
+  /** 返回设置页 */
+  container.querySelector<HTMLButtonElement>("#backToSettings")?.addEventListener("click", () => opts?.onBack?.());
 
   /** 复制源码：成功 → 绿色 ✓ 反馈 + toast；失败 → 提示手动复制 */
   const copyWorker = container.querySelector<HTMLButtonElement>("#copyWorker");

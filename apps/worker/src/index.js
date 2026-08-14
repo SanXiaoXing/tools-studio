@@ -19,8 +19,8 @@
  *
  * 环境变量（在 Cloudflare 控制台填写，本文件不包含密钥值）：
  *   API_KEY         必填，共享密钥，与客户端设置页 API Key 一致（存为 Secret）
- *   PUBLIC_BASE_URL 必填，图片域名（R2 自定义域），如 https://img.sanxiaoxing.cn，结尾无斜杠；
- *                   注意：不是 API 域名（img-service.sanxiaoxing.cn）
+ *   PUBLIC_BASE_URL 必填，图片域名（R2 自定义域），如 https://img.example.com，结尾无斜杠；
+ *                   注意：不是 API 域名（api.example.com）
  *   ALLOWED_TYPES   可选，逗号分隔的 Content-Type 白名单（默认内置图片五类）
  *   MAX_SIZE_MB     可选，单文件上限 MB（默认 20，与前端"单张不超过 20 MB"一致）
  *
