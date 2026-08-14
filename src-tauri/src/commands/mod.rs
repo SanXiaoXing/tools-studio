@@ -4,6 +4,7 @@ use crate::config;
 use crate::error::AppError;
 use crate::services::compress;
 use crate::services::delete;
+use crate::services::list;
 use crate::services::upload;
 use crate::services::usage;
 
@@ -62,6 +63,17 @@ pub async fn sync_usage(rescan: bool) -> Result<usage::UsageInfo, AppError> {
 pub async fn delete_image(key: String) -> Result<(), AppError> {
     let cfg = config::load()?;
     delete::delete_file(&cfg.server, &cfg.api_key, &key).await
+}
+
+/// 拉取云端图片列表（API.md §4：GET /objects），用于启动时恢复图片库。
+/// limit 每页数量（默认 100，最大 1000）；cursor 为上次返回的分页游标。
+#[tauri::command]
+pub async fn list_images(
+    limit: Option<u32>,
+    cursor: Option<String>,
+) -> Result<list::ObjectList, AppError> {
+    let cfg = config::load()?;
+    list::list_objects(&cfg.server, &cfg.api_key, limit, cursor).await
 }
 
 /// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）

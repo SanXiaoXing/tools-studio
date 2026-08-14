@@ -4,8 +4,18 @@ import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import { renderDeployView } from "./features/deploy/deployView";
-import type { ImageItem, UsageInfo, ViewName } from "./lib/types";
-import { copyText, errorMessage, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./lib/utils";
+import type { ImageItem, ObjectItem, ObjectList, UsageInfo, ViewName } from "./lib/types";
+import {
+  basename,
+  copyText,
+  errorMessage,
+  feedbackCheck,
+  formatBytes,
+  formatContent,
+  pad2,
+  parseSizeToBytes,
+  showToast,
+} from "./lib/utils";
 import { icon } from "./lib/icons";
 import { getSettings } from "./lib/settings";
 import { applyTheme } from "./lib/theme";
@@ -101,6 +111,61 @@ async function refreshCloudUsage(): Promise<void> {
     setStorage(u.size);
   } catch {
     /* 云端不可用时保持现有显示，不打扰用户 */
+  }
+}
+
+/** ISO 时间 → "YYYY-MM-DD HH:mm"（本地时区），与上传列表日期格式一致 */
+function formatCloudDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/** 云端对象 → 图片库项：名称取 key 末段，尺寸/时间来自 Worker 返回（无本地文件元数据） */
+function cloudItemToImageItem(o: ObjectItem): ImageItem {
+  const ext = (o.key.split(".").pop() ?? "").toUpperCase();
+  return {
+    name: basename(o.key) || o.key,
+    type: ext || "FILE",
+    size: formatBytes(o.size),
+    dims: "未知",
+    date: formatCloudDate(o.uploaded),
+    path: o.key,
+    url: o.url,
+  };
+}
+
+/** 图片扩展名白名单（与 Worker 的 ALLOWED_TYPES 一致），用于过滤云端列表 */
+const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif"]);
+
+/** 仅图片对象：key 以图片扩展名结尾，排除目录占位（/ 结尾）等非图片对象 */
+function isImageObject(o: ObjectItem): boolean {
+  if (o.key.endsWith("/")) return false;
+  const ext = o.key.slice(o.key.lastIndexOf(".") + 1).toLowerCase();
+  return IMAGE_EXTS.has(ext);
+}
+
+/** 启动时从云端拉取图片列表（API.md §4：GET /objects，分页合并），重启后仍能看到历史图片。
+ *  失败（如未配置 Worker）时保持空状态，不打扰用户。 */
+async function loadCloudGallery(): Promise<void> {
+  try {
+    const all: ObjectItem[] = [];
+    let cursor: string | null = null;
+    do {
+      // 显式标注类型：do-while 中 cursor/page 相互引用会触发 TS7022 循环推断
+      const page: ObjectList = await invoke<ObjectList>("list_images", {
+        limit: 1000,
+        cursor: cursor ?? null,
+      });
+      // 过滤非图片对象（目录占位 / 非图片扩展名），兼容旧版未过滤的 Worker
+      all.push(...page.items.filter(isImageObject));
+      cursor = page.has_more ? page.cursor : null;
+    } while (cursor);
+    // R2 列表按 key 升序（即时间正序）；倒序让最新图片排最前，与上传流程一致
+    items = all.reverse().map(cloudItemToImageItem);
+    render();
+  } catch {
+    /* 未配置 Worker 或拉取失败：保持空状态，不打扰 */
   }
 }
 
@@ -209,6 +274,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
   }
 });
 
-// 数据同步就绪即渲染（无骨架屏表演）；启动即拉取云端真实用量（本地 items 为空，云端可能已有历史图片）
+// 数据同步就绪即渲染（无骨架屏表演）；启动即拉取云端真实用量与历史图片列表（本地 items 为空）
 render();
 void refreshCloudUsage();
+void loadCloudGallery();

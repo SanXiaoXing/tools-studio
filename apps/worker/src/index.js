@@ -245,7 +245,8 @@ async function listObjects(env, url, cors) {
   return success(
     {
       items: listed.objects
-        .filter((o) => !o.key.startsWith(META_PREFIX)) // 排除统计元对象
+        // 排除统计元对象（_meta/）与目录占位对象（key 以 / 结尾、无图片扩展名），只返回图片
+        .filter((o) => !o.key.startsWith(META_PREFIX) && isImageKey(o.key))
         .map((o) => ({
           key: o.key,
           url: `${base}/${o.key}`,
@@ -375,6 +376,15 @@ function formatBytes(bytes) {
 }
 
 /* ---------- validation helpers ---------- */
+
+/** 是否图片对象：key 以图片扩展名结尾（自动排除目录占位对象与 _meta 等非图片对象）
+ * @param {string} key
+ * @returns {boolean} */
+function isImageKey(key) {
+  if (key.endsWith("/")) return false; // 目录占位对象（R2 中 key 以 / 结尾）
+  const ext = key.slice(key.lastIndexOf(".") + 1).toLowerCase();
+  return Boolean(EXT_MIME[ext]);
+}
 
 /**
  * @param {string} key

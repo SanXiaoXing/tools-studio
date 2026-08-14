@@ -57,3 +57,20 @@ export interface UsageInfo {
   sizeFormatted: string;
   updatedAt: string;
 }
+
+/** 云端对象列表项（API.md §4：GET /objects 响应 items，list_images 命令透传） */
+export interface ObjectItem {
+  key: string;
+  url: string;
+  size: number;
+  /** ISO 8601 上传时间（如 "2026-08-14T08:00:00Z"） */
+  uploaded: string;
+}
+
+/** GET /objects 响应（API.md §4），用于启动时恢复图片库 */
+export interface ObjectList {
+  items: ObjectItem[];
+  /** 分页游标；has_more=false 时为 null */
+  cursor: string | null;
+  has_more: boolean;
+}

@@ -82,8 +82,8 @@ export const readDims = (url: string, cb: (w: number | null, h: number | null) =
   img.src = url;
 };
 
-/** 图片地址：上传流每项都带 objectURL（convertFileSrc 本地路径），无需 picsum mock 兜底 */
-export const imgSrc = (it: ImageItem): string => it.objectURL || "";
+/** 图片地址：优先本地 objectURL（上传转换产物），云端恢复的图片（无 objectURL）回退到公开 URL */
+export const imgSrc = (it: ImageItem): string => it.objectURL || it.url || "";
 
 /** 底部轻提示（单例；浅色深底 / 深色浅底由 CSS 变量自动反转） */
 let toastEl: HTMLElement | null = null;

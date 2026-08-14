@@ -15,6 +15,7 @@ pub fn run() {
             commands::upload_image,
             commands::sync_usage,
             commands::delete_image,
+            commands::list_images,
             commands::export_settings,
             commands::import_settings
         ])
