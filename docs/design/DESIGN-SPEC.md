@@ -250,7 +250,7 @@
 2. **图标**：内联 SVG，`stroke-width="1.7"`、`stroke-linecap/linejoin="round"`、`fill="none"`、`aria-hidden="true"`，全站同一描边宽；不手绘复杂图形，不混用 emoji。
 3. **z-index 分层**：弹窗遮罩 `40`、toast `60`；禁止随意堆 `z-*`，滚动容器不设 z-index。
 4. **图片预览**：`URL.createObjectURL` 仅用于展示（缩略图 / 弹窗 / 队列），不参与业务数据持久化。
-5. **本地存储 key**：`as-collapsed`（侧边栏折叠态）、`as-settings`（设置 JSON）、`as-cache`（图片库与存储用量缓存 JSON，启动秒开 + 离线兜底）。
+5. **本地存储 key**：`as-collapsed`（侧边栏折叠态）、`as-settings`（设置 JSON）、`as-cache`（图片库与存储用量缓存 JSON，启动秒开 + 离线兜底，超过 7 天自动重新拉取）。
 6. **骨架屏**：shimmer 动画与 `prefers-reduced-motion` 冲突时回退静态灰块。
 7. **表单**：输入框 `autocomplete="off"`、`spellcheck="false"`；label 在输入框上方。
 8. **删除**：一律两阶段确认，不可一键完成（不可逆操作）。

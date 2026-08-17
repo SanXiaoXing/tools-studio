@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ImageItem, UsageInfo } from "./types";
 import { copyText, errorMessage, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./utils";
-import { loadGalleryCache, saveGalleryCache } from "./cache";
+import { isGalleryCacheStale, loadGalleryCache, saveGalleryCache } from "./cache";
 
 /**
  * 应用级状态单例（模块作用域持久化 + 本地缓存）。
@@ -33,6 +33,9 @@ const commit = (): void => {
 
 export const getItems = (): ImageItem[] => items;
 export const getCloudUsage = (): number | null => cloudUsage;
+
+/** 启动时是否需要拉取云端：缓存缺失或已过期才同步；命中新鲜缓存则直接用（减少每次启动的 GET） */
+export const isCloudSyncNeeded = (): boolean => isGalleryCacheStale(cached);
 
 /** 估算已用字节：优先云端真实统计，否则本地累加（历史图片无字节信息时兜底） */
 export const getUsedBytes = (): number =>

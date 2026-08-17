@@ -13,6 +13,7 @@ import {
   copyLink,
   getItems,
   getUsedBytes,
+  isCloudSyncNeeded,
   refreshCloudUsage,
   removeItem,
   setItems,
@@ -216,8 +217,11 @@ void getCurrentWebview().onDragDropEvent((event) => {
   }
 });
 
-// 数据同步就绪即渲染；启动时先展示本地缓存（秒开），随后拉取云端真实用量与历史图片列表覆盖缓存
+// 数据同步就绪即渲染；缓存命中且未过期时直接使用本地数据（秒开、少读），
+// 仅当缓存缺失或超过有效期才拉取云端真实用量与图片列表（上传/删除会写回并续期缓存）
 subscribe(render);
 render();
-void refreshCloudUsage();
-void loadCloudGallery();
+if (isCloudSyncNeeded()) {
+  void refreshCloudUsage();
+  void loadCloudGallery();
+}

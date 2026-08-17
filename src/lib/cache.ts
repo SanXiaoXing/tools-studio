@@ -10,6 +10,9 @@ import type { ImageItem } from "./types";
 const CACHE_KEY = "as-cache";
 const CACHE_VERSION = 1;
 
+/** 缓存有效期：超过该时长未更新（无上传/删除/云端同步），启动时重新拉取云端，平衡秒开与数据新鲜度 */
+export const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+
 export interface GalleryCache {
   v: number;
   /** 最近一次云端图片列表（最新在前，ImageItem 序列化结果，无 objectURL） */
@@ -41,6 +44,14 @@ export function loadGalleryCache(): GalleryCache | null {
   } catch {
     return null;
   }
+}
+
+/** 缓存是否过期：无缓存 / savedAt 非法 / 超过有效期均视为需重新同步云端 */
+export function isGalleryCacheStale(cache: GalleryCache | null): boolean {
+  if (!cache) return true;
+  const t = Date.parse(cache.savedAt);
+  if (!Number.isFinite(t)) return true;
+  return Date.now() - t > CACHE_MAX_AGE_MS;
 }
 
 /** 写入缓存：显式白名单序列化（剥离 objectURL 等会话级字段），存储失败静默降级 */
