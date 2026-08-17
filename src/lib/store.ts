@@ -1,22 +1,34 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ImageItem, UsageInfo } from "./types";
 import { copyText, errorMessage, feedbackCheck, formatContent, parseSizeToBytes, showToast } from "./utils";
+import { loadGalleryCache, saveGalleryCache } from "./cache";
 
 /**
- * 应用级状态单例（模块作用域持久化）。
+ * 应用级状态单例（模块作用域持久化 + 本地缓存）。
  *
  * 把原先散落在 main.ts 顶层的 items / cloudUsage 与跨视图副作用
  * （copyLink / removeItem / refreshCloudUsage）收敛到此处，feature 模块
  * 直接 import 读写，无需经 main.ts 回调链（onUploaded / onUsageResolved / onCopy）。
  * render 由订阅者注册，状态变更自动触发重绘。
+ *
+ * 启动即从缓存恢复上次的图片库与用量（cache.ts），秒开且离线可用；
+ * 云端同步成功后覆盖缓存，删除/上传等本地变更同步写回缓存。
  */
 
-let items: ImageItem[] = [];
-let cloudUsage: number | null = null;
+// 启动即读缓存：云端不可达时仍显示上次数据，后台同步成功后覆盖
+const cached = loadGalleryCache();
+let items: ImageItem[] = cached?.items ?? [];
+let cloudUsage: number | null = cached?.usageSize ?? null;
 const listeners = new Set<() => void>();
 
 const emit = (): void => {
   for (const fn of listeners) fn();
+};
+
+/** 统一提交：持久化到本地缓存后再通知订阅者重绘（所有状态变更必须走这里） */
+const commit = (): void => {
+  saveGalleryCache(items, cloudUsage);
+  emit();
 };
 
 export const getItems = (): ImageItem[] => items;
@@ -28,19 +40,19 @@ export const getUsedBytes = (): number =>
 
 export const setItems = (next: ImageItem[]): void => {
   items = next;
-  emit();
+  commit();
 };
 export const addItem = (it: ImageItem): void => {
   items = [it, ...items];
-  emit();
+  commit();
 };
 export const removeLocalItem = (it: ImageItem): void => {
   items = items.filter((x) => x !== it);
-  emit();
+  commit();
 };
 export const setCloudUsage = (n: number | null): void => {
   cloudUsage = n;
-  emit();
+  commit();
 };
 
 export const subscribe = (fn: () => void): (() => void) => {
@@ -55,7 +67,7 @@ export async function refreshCloudUsage(): Promise<void> {
   try {
     const u = await invoke<UsageInfo>("sync_usage", { rescan: false });
     cloudUsage = u.size;
-    emit();
+    commit();
   } catch {
     /* 云端不可用时保持现有显示，不打扰用户 */
   }
@@ -86,7 +98,7 @@ export async function removeItem(it: ImageItem): Promise<void> {
     }
   }
   items = items.filter((x) => x !== it);
-  emit();
+  commit();
   void refreshCloudUsage(); // 删除后同步云端统计（Worker 已 -1）
   showToast(`已删除 ${it.name}`);
 }

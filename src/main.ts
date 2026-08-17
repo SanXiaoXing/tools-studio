@@ -129,7 +129,7 @@ function isImageObject(o: ObjectItem): boolean {
 }
 
 /** 启动时从云端拉取图片列表（API.md §4：GET /objects，分页合并），重启后仍能看到历史图片。
- *  失败（如未配置 Worker）时保持空状态，不打扰用户。 */
+ *  失败（如未配置 Worker）时保留本地缓存（store 已从缓存恢复），不打扰用户。 */
 async function loadCloudGallery(): Promise<void> {
   try {
     const all: ObjectItem[] = [];
@@ -216,7 +216,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
   }
 });
 
-// 数据同步就绪即渲染（无骨架屏表演）；启动即拉取云端真实用量与历史图片列表（本地 items 为空）
+// 数据同步就绪即渲染；启动时先展示本地缓存（秒开），随后拉取云端真实用量与历史图片列表覆盖缓存
 subscribe(render);
 render();
 void refreshCloudUsage();
