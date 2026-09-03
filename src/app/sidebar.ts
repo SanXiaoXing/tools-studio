@@ -21,11 +21,13 @@ export interface Sidebar {
   setStorage: (usedBytes: number) => void;
 }
 
+/** 侧边栏框架（docs/design/sidebar.md）：品牌头右上角内嵌折叠按钮 + CTA + 导航 + 底部空间用量。
+ *  折叠态（68px 图标轨）：仅保留图标，右上角展开按钮不显示；点击顶部 logo 即可展开。 */
 export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
   const el = document.createElement("aside");
   el.className =
-    "flex flex-col gap-5 shrink-0 bg-surface2 border-r border-line px-3.5 pt-4 pb-3.5 overflow-hidden " +
-    "transition-[width] duration-300 ease-[cubic-bezier(.32,.72,.24,1)]";
+    "sidebar flex flex-col shrink-0 bg-surface2 border-r border-line overflow-hidden";
+  // 折叠宽度过渡由 styles.css 的 .sidebar 非分层规则声明（300ms cubic-bezier）
 
   let collapsed = false;
   try {
@@ -45,30 +47,30 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
   ).join("");
 
   el.innerHTML = `
-    <a class="brand flex items-center gap-2.5 px-1.5 text-ink text-[15px] font-bold whitespace-nowrap" href="#">
-      <img class="brand-icon shrink-0" src="${appIcon}" alt="" width="22" height="22"><span class="brand-name tracking-tight">Assets Studio</span>
-    </a>
-    <button class="upload-cta flex items-center justify-center gap-2 w-full h-[42px] rounded-[10px] bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition whitespace-nowrap" type="button">
-      ${icon.upload}<span class="cta-label">上传图片</span>
-    </button>
-    <nav class="flex flex-col gap-1">${navHTML}</nav>
-    <div class="flex-1"></div>
-    <div class="storage px-2">
-      <div class="flex justify-between text-xs text-ink3 mb-2 whitespace-nowrap tnum"><span>已用空间</span><span class="storage-text">0 B / 10.0 GB</span></div>
-      <div class="h-1 rounded-full bg-line overflow-hidden"><div class="storage-bar h-full rounded-full bg-accent" style="width:0%"></div></div>
-    </div>
-    <button class="collapse-btn flex items-center gap-2.5 w-full px-3 py-2 rounded-[10px] text-ink2 text-[13px] hover:bg-surface3 hover:text-ink transition whitespace-nowrap" type="button" title="收起侧边栏">
-      ${icon.panel}<span class="collapse-label">收起侧边栏</span>
-    </button>`;
+    <header class="brand-row flex items-center gap-1 h-[52px] px-3.5 border-b border-line shrink-0">
+      <a class="brand flex items-center gap-2.5 min-w-0 flex-1 text-ink text-[15px] font-bold whitespace-nowrap" href="#" title="Assets Studio">
+        <img class="brand-icon shrink-0" src="${appIcon}" alt="" width="22" height="22"><span class="brand-name truncate tracking-tight">Assets Studio</span>
+      </a>
+      <button class="collapse-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink2 hover:bg-surface3 hover:text-ink transition-colors" type="button" title="收起侧边栏" aria-label="收起侧边栏">${icon.panel}</button>
+    </header>
+    <div class="side-body flex min-h-0 flex-1 flex-col gap-3 px-3.5 pt-3.5 pb-3.5 overflow-hidden">
+      <button class="upload-cta flex items-center justify-center gap-2 w-full h-[42px] rounded-[10px] bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition whitespace-nowrap" type="button" title="上传图片">
+        ${icon.upload}<span class="cta-label">上传图片</span>
+      </button>
+      <nav class="flex flex-col gap-1">${navHTML}</nav>
+      <div class="flex-1"></div>
+      <div class="storage px-2">
+        <div class="flex justify-between text-xs text-ink3 mb-2 whitespace-nowrap tnum"><span>已用空间</span><span class="storage-text">0 B / 10.0 GB</span></div>
+        <div class="h-1 rounded-full bg-line overflow-hidden"><div class="storage-bar h-full rounded-full bg-accent" style="width:0%"></div></div>
+      </div>
+    </div>`;
 
   const applyCollapsed = (now: boolean) => {
     el.classList.toggle("sidebar-collapsed", now);
     el.style.width = now ? "68px" : "236px";
-    const cb = el.querySelector<HTMLButtonElement>(".collapse-btn");
-    if (cb) {
-      cb.title = now ? "展开侧边栏" : "收起侧边栏";
-      cb.setAttribute("aria-label", cb.title);
-    }
+    // 折叠后 logo 即展开入口：更新其提示文案
+    const brand = el.querySelector<HTMLElement>(".brand");
+    if (brand) brand.title = now ? "展开侧边栏" : "Assets Studio";
     el.querySelectorAll<HTMLElement>("[data-view]").forEach((n) => {
       n.style.justifyContent = now ? "center" : "";
       n.style.padding = now ? "10px" : "";
@@ -76,7 +78,24 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
   };
   applyCollapsed(collapsed);
 
+  const toggleCollapsed = (): void => {
+    collapsed = !collapsed;
+    applyCollapsed(collapsed);
+    try {
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* 忽略 */
+    }
+  };
+
   el.addEventListener("click", (e) => {
+    // 折叠态下点击顶部 logo 展开（缩小时右上角无展开按钮，logo 即入口）
+    const brand = (e.target as HTMLElement).closest(".brand");
+    if (brand) {
+      e.preventDefault();
+      if (collapsed) toggleCollapsed();
+      return;
+    }
     const nav = (e.target as HTMLElement).closest("[data-view]");
     if (nav) {
       e.preventDefault();
@@ -89,13 +108,7 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
     }
     const cb = (e.target as HTMLElement).closest(".collapse-btn");
     if (cb) {
-      collapsed = !collapsed;
-      applyCollapsed(collapsed);
-      try {
-        localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
-      } catch {
-        /* 忽略 */
-      }
+      toggleCollapsed();
     }
   });
 

@@ -12,7 +12,11 @@ const PATHS = {
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
 } as const;
+
+const dotSvg = (size: number): string =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
 
 const svg = (paths: string, size = 18): string =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -31,4 +35,6 @@ export const icon = {
   code: svg(PATHS.code, 18),
   arrow: svg(PATHS.arrow, 15),
   refresh: svg(PATHS.refresh, 17),
+  plus: svg(PATHS.plus, 16),
+  dots: dotSvg(16),
 } as const;

@@ -1,4 +1,5 @@
 import { renderSidebar } from "./app/sidebar";
+import { createTabBar, type TabDef } from "./app/tabbar";
 import { renderGallery } from "./features/gallery/gallery";
 import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
@@ -72,8 +73,18 @@ const views: Record<ViewName, HTMLElement> = {
   deploy: deployView,
 };
 
-/** 视图切换：隐藏非当前视图，同步导航激活态 */
-function switchView(v: ViewName): void {
+/** 标签页定义（docs/design/sidebar.md 框架）：四个内置视图各对应一个可开关的标签页 */
+const TAB_DEFS: TabDef[] = [
+  { id: "gallery", label: "浏览图片", icon: icon.image },
+  { id: "upload", label: "上传图片", icon: icon.upload },
+  { id: "settings", label: "设置", icon: icon.sliders },
+  { id: "deploy", label: "部署 Worker", icon: icon.code },
+];
+
+const { el: sidebarEl, navCount, setStorage } = renderSidebar((v) => tabbar.open(v));
+
+/** 展示视图：隐藏非当前视图，同步导航激活态（激活态由标签条驱动） */
+function showView(v: ViewName): void {
   for (const name of Object.keys(views) as ViewName[]) views[name].hidden = name !== v;
   sidebarEl.querySelectorAll<HTMLElement>("[data-view]").forEach((n) => {
     const active = n.getAttribute("data-view") === v;
@@ -87,14 +98,22 @@ function switchView(v: ViewName): void {
   });
 }
 
-const { el: sidebarEl, navCount, setStorage } = renderSidebar(switchView);
+// 标签条：状态持久化恢复（打开顺序 + 激活视图），首帧 onChange 完成初始视图切换
+const tabbar = createTabBar(TAB_DEFS, showView);
 
+// 应用外壳（sidebar.md 框架）：侧边栏 + 内容列（chrome 色底）＝ 标签条 + 圆角内容面板
 const content = document.createElement("main");
-content.className = "flex-1 min-w-0 flex flex-col overflow-hidden";
+content.className = "flex-1 min-w-0 flex flex-col overflow-hidden bg-surface2";
+content.appendChild(tabbar.el);
+const sheetWrap = document.createElement("div");
+sheetWrap.className = "relative flex-1 min-h-0 pr-3 pb-3 overflow-hidden";
+const sheet = document.createElement("section");
+sheet.className = "relative h-full rounded-xl bg-canvas shadow-card overflow-hidden flex flex-col";
+sheetWrap.appendChild(sheet);
+content.appendChild(sheetWrap);
 app.appendChild(sidebarEl);
 app.appendChild(content);
-for (const v of Object.keys(views) as ViewName[]) content.appendChild(views[v]);
-switchView("gallery"); // 初始视图：隐藏其余视图并高亮导航
+for (const v of Object.keys(views) as ViewName[]) sheet.appendChild(views[v]);
 
 const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
 
@@ -191,7 +210,7 @@ function render(): void {
   const items = getItems();
   renderGallery(galleryBody, items, {
     onDetail: (it) => modal.open(it),
-    onEmptyUpload: () => switchView("upload"),
+    onEmptyUpload: () => tabbar.open("upload"),
   });
   navCount.textContent = String(items.length);
   gallerySub.textContent =
@@ -203,13 +222,13 @@ const uploadApi: UploadApi = renderUploadView(uploadBody);
 // 存储用量：设置页手动刷新（WORKER-V2.md §8）时直接写入 store，订阅触发侧边栏同步；
 // 「部署 Worker」入口：跳转到部署页面（侧边栏已移除该导航）
 renderSettingsView(settingsBody, {
-  onOpenDeploy: () => switchView("deploy"),
+  onOpenDeploy: () => tabbar.open("deploy"),
 });
 
 // 部署 Worker 视图：展示源码/配置 + 复制按钮，用户自行部署（不替用户创建远端资源）；
 // 「返回设置」按钮回到设置页（从设置页入口进入，侧边栏无独立导航）
 renderDeployView(deployBody, {
-  onBack: () => switchView("settings"),
+  onBack: () => tabbar.open("settings"),
 });
 
 // ---- 全局拖拽遮罩（vanilla 内联）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
@@ -239,7 +258,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
   if (t === "leave") setDragVisible(false);
   if (t === "drop") {
     setDragVisible(false);
-    switchView("upload");
+    tabbar.open("upload");
     uploadApi.requestUpload(event.payload.paths);
   }
 });

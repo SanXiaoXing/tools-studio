@@ -104,14 +104,137 @@
 /* [hidden] 优先级修复（DESIGN-SPEC §8.1）：防止 display 工具类覆盖 hidden 属性 */
 [hidden] { display: none !important; }
 
-/* 侧边栏折叠态（DESIGN-SPEC §3.2）：隐藏文字仅留图标 */
+/* 侧边栏折叠宽度动画：显式非分层规则。
+   文件顶部非分层的 * 声明了仅颜色类的 transition-property（@layer utilities 内的
+   transition-[width] 会被其覆盖），width 需在这里单独声明才会真正过渡。 */
+.sidebar {
+  transition-property: width;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+/* 侧边栏折叠态（DESIGN-SPEC §3.2 / sidebar.md 框架）：隐藏文字仅留图标。
+   折叠按钮在品牌头内（.collapse-top）；折叠后显示其下方居中的展开按钮（.collapse-rail）。 */
 .sidebar-collapsed .nav-label,
 .sidebar-collapsed .cta-label,
 .sidebar-collapsed .brand-name,
 .sidebar-collapsed .nav-count,
-.sidebar-collapsed .storage,
-.sidebar-collapsed .collapse-label {
+.sidebar-collapsed .storage {
   display: none;
+}
+/* 折叠态不显示右上角展开按钮（展开入口为点击顶部 logo） */
+.sidebar-collapsed .collapse-btn {
+  display: none;
+}
+/* 折叠后品牌区只剩 logo：水平居中，与下方图标列中心对齐 */
+.sidebar-collapsed .brand-row {
+  justify-content: center;
+  padding-inline: 0;
+}
+.sidebar-collapsed .brand {
+  justify-content: center;
+}
+
+/* Chrome 式标签条（sidebar.md 框架）：激活标签与内容面板同底色，合并为一个「面板」。
+   标签图标 / 关闭图标统一收小（图标源尺寸 16-19px） */
+.tab-ic svg {
+  width: 15px;
+  height: 15px;
+}
+.tab-close {
+  opacity: 0;
+}
+.tab:hover .tab-close,
+.tab[aria-selected="true"] .tab-close {
+  opacity: 1;
+}
+.tab-close svg {
+  width: 12px;
+  height: 12px;
+}
+/* 标签横排溢出时隐藏滚动条（标签本身可横向滚动） */
+.tablist::-webkit-scrollbar {
+  display: none;
+}
+
+/* 标签动画（sidebar.md 框架）：
+   激活指示条 = 与内容面板同色的「纸面」，位置由 JS 缓动补间逐帧驱动（style.left/width）；
+   标签节点持久化，进出场宽度动画由 JS 控制；无拖拽排序 */
+.tab-active-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  border-radius: 12px 12px 0 0; /* 与标签 rounded-t-xl 一致 */
+  background: var(--color-canvas);
+  pointer-events: none;
+}
+/* 贴合并排：非激活标签之间用 1px 分隔线划分；末尾或紧邻激活标签（右侧）时不画，
+   保证激活「纸面」与相邻标签之间无竖线（对齐文档 ChromeTab 分隔逻辑） */
+.tablist .tab:not([aria-selected="true"])::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 16px;
+  translate: 0 -50%;
+  background: var(--color-line);
+  pointer-events: none;
+}
+.tablist .tab:not([aria-selected="true"]):last-child::after,
+.tablist .tab:not([aria-selected="true"]):has(+ .tab[aria-selected="true"])::after {
+  content: none;
+}
+
+/* 右键上下文菜单（文档 ContextMenu）：body 级 fixed 浮层 */
+.ctx-root {
+  position: fixed;
+  z-index: 40;
+  min-width: 176px;
+  padding: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-modal);
+  animation: ctx-in 120ms ease-out;
+}
+@keyframes ctx-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.ctx-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-ink);
+  text-align: left;
+}
+.ctx-item:not(:disabled) {
+  cursor: pointer;
+}
+.ctx-item:not(:disabled):hover {
+  background: var(--color-surface3);
+}
+.ctx-item:disabled {
+  opacity: 0.45;
+}
+.ctx-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.ctx-ic svg {
+  width: 14px;
+  height: 14px;
+}
+.ctx-ic.flip svg {
+  transform: scaleX(-1); /* 「关闭左侧」用右箭头镜像 */
 }
 
 /* 删除确认态：遮罩保持显示（DESIGN-SPEC §3.3） */
