@@ -16,16 +16,17 @@
  *
  * 环境变量（在 Cloudflare 控制台填写，本文件不包含密钥值）：
  *   IMAGES             R2 桶绑定（必填）
- *   ALLOWED_REFERERS   可选，防盗链 Referer host 白名单（逗号分隔，精确 host 或子域均可；
- *                      默认 sanxiaoxing.cn,www.sanxiaoxing.cn）
+ *   ALLOWED_REFERERS   必填，防盗链 Referer host 白名单（逗号分隔，可多个主域；填主域即可，
+ *                      子域自动命中，如 sanxiaoxing.cn 覆盖 www./blog./img. 等全部子域）。
+ *                      代码无内置默认：不配置则所有带 Referer 的请求一律 403（fail-closed）
  *   ALLOWED_ORIGINS    可选，CORS 白名单（逗号分隔的完整 origin，如 https://sanxiaoxing.cn；
  *                      缺省时由 ALLOWED_REFERERS 自动推导为 https://<host>）
  *   ALLOW_EMPTY_REFERER 可选，无 Referer 请求是否放行（默认 1 = 放行；0 = 拒绝）
  *   CACHE_TTL_SECONDS  可选，Cache API 缓存时长秒（默认 86400 = 1 天）
  *
  * 防盗链规则（Issue #1 §Referer 处理规则）：
- *   - 有 Referer 且 host 命中白名单（含子域）            → 200 放行
- *   - 有 Referer 且 host 不在白名单（第三方站点盗链）     → 403
+ *   - 有 Referer 且 host 命中 env 白名单（含子域）        → 200 放行
+ *   - 有 Referer 且 host 不在白名单 / 白名单未配置        → 403
  *   - 无 Referer（地址栏直开 / 隐私模式 / 桌面端 / curl） → 默认 200 放行
  *
  * 后续扩展：Token / 签名 URL / 有效期可在此文件内按 /public/*、/private/* 前缀分支实现。
@@ -34,14 +35,11 @@
 /**
  * @typedef {Object} Env
  * @property {R2Bucket} IMAGES - R2 存储桶绑定（与 API Worker 同一桶）
- * @property {string} [ALLOWED_REFERERS] - Referer host 白名单（逗号分隔）
+ * @property {string} [ALLOWED_REFERERS] - Referer host 白名单（逗号分隔；必填项，未配置时带 Referer 请求一律 403）
  * @property {string} [ALLOWED_ORIGINS] - CORS 白名单 origin（逗号分隔）
  * @property {string} [ALLOW_EMPTY_REFERER] - 无 Referer 是否放行（1/0）
  * @property {string} [CACHE_TTL_SECONDS] - 缓存秒数
  */
-
-/** 默认 Referer 白名单（与 Issue #1 验收一致；子域匹配，无需重复列出 www / img） */
-const DEFAULT_REFERERS = ["sanxiaoxing.cn", "www.sanxiaoxing.cn"];
 
 /** 扩展名 → MIME（与 API Worker 一致；只服务图片，天然拒绝非图片类型）
  * @type {Record<string, string>} */
@@ -181,7 +179,7 @@ function checkReferer(request, env) {
  * @returns {boolean}
  */
 function refererAllowed(host, env) {
-  const list = parseList(env.ALLOWED_REFERERS, DEFAULT_REFERERS);
+  const list = parseList(env.ALLOWED_REFERERS, []);
   return list.some((entry) => {
     const e = entry.toLowerCase();
     return host === e || host.endsWith("." + e);
@@ -217,7 +215,7 @@ function handlePreflight(request, env) {
 function originAllowed(origin, env) {
   const explicit = env.ALLOWED_ORIGINS;
   if (explicit) return parseList(explicit, []).includes(origin.replace(/\/+$/, ""));
-  const referers = parseList(env.ALLOWED_REFERERS, DEFAULT_REFERERS);
+  const referers = parseList(env.ALLOWED_REFERERS, []);
   return referers.some((entry) => origin === `https://${entry}`);
 }
 

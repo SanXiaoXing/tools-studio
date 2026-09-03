@@ -134,7 +134,7 @@ export function renderDeployView(
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
         <h2 class="text-[15px] font-bold mb-1">Image Edge Worker 环境变量</h2>
         <p class="text-xs text-ink3 leading-relaxed mb-3.5">
-          在 Image Edge Worker「设置 → 变量和机密」页面填写；除「绑定」外均可不填，用默认值即可（默认白名单为 <code class="${CODE_CLS}">sanxiaoxing.cn,www.sanxiaoxing.cn</code>）。
+          在 Image Edge Worker「设置 → 变量和机密」页面填写；其中 <code class="${CODE_CLS}">ALLOWED_REFERERS</code> 必填（填你自己的主域名即可，子域自动命中），其余变量可不填用默认值。
         </p>
         <div class="overflow-hidden rounded-lg border border-line">
           <table class="w-full text-[12.5px]">
@@ -147,7 +147,7 @@ export function renderDeployView(
             </thead>
             <tbody class="text-ink2 divide-y divide-line">
               <tr><td class="px-3 py-2 font-mono text-ink">IMAGES</td><td class="px-3 py-2">是</td><td class="px-3 py-2">R2 存储桶绑定（「设置 → 绑定」），与 API Worker 同一桶</td></tr>
-              <tr><td class="px-3 py-2 font-mono text-ink">ALLOWED_REFERERS</td><td class="px-3 py-2">否</td><td class="px-3 py-2">防盗链 Referer host 白名单（逗号分隔，含子域），默认 sanxiaoxing.cn,www.sanxiaoxing.cn</td></tr>
+              <tr><td class="px-3 py-2 font-mono text-ink">ALLOWED_REFERERS</td><td class="px-3 py-2">是</td><td class="px-3 py-2">防盗链 Referer host 白名单（逗号分隔，填主域即可、子域自动命中）；无内置默认，未配置时带 Referer 请求一律 403</td></tr>
               <tr><td class="px-3 py-2 font-mono text-ink">ALLOWED_ORIGINS</td><td class="px-3 py-2">否</td><td class="px-3 py-2">CORS origin 白名单（逗号分隔），缺省由 ALLOWED_REFERERS 推导 https://host</td></tr>
               <tr><td class="px-3 py-2 font-mono text-ink">ALLOW_EMPTY_REFERER</td><td class="px-3 py-2">否</td><td class="px-3 py-2">无 Referer 是否放行，默认 1（放行；地址栏直开 / 桌面端预览 / curl 不受影响）</td></tr>
               <tr><td class="px-3 py-2 font-mono text-ink">CACHE_TTL_SECONDS</td><td class="px-3 py-2">否</td><td class="px-3 py-2">Cache API 缓存秒数，默认 86400（1 天）</td></tr>

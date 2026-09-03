@@ -337,7 +337,7 @@ Rust 侧通过 `serde` 序列化/反序列化，类型结构与此对应。v1 �
 | 变量 | 必填 | 说明 |
 |---|---|---|
 | `IMAGES`（binding） | 是 | R2 桶（与 API Worker 同一桶） |
-| `ALLOWED_REFERERS` | 否 | Referer host 白名单（逗号分隔，含子域匹配）；默认 `sanxiaoxing.cn,www.sanxiaoxing.cn` |
+| `ALLOWED_REFERERS` | 是 | 防盗链 Referer host 白名单（逗号分隔，填主域即可、子域自动命中）；**无内置默认**，未配置时所有带 Referer 的请求一律 403（fail-closed） |
 | `ALLOWED_ORIGINS` | 否 | CORS origin 白名单（逗号分隔）；缺省由 ALLOWED_REFERERS 推导 `https://<host>` |
 | `ALLOW_EMPTY_REFERER` | 否 | 无 Referer 是否放行，默认 `1`（放行） |
 | `CACHE_TTL_SECONDS` | 否 | Cache API 缓存秒数，默认 `86400` |

@@ -202,7 +202,7 @@ cargo test           # Rust 侧测试（在 src-tauri/ 下）
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
-| `ALLOWED_REFERERS` | 否 | 防盗链 Referer host 白名单（逗号分隔，含子域匹配），默认 `sanxiaoxing.cn,www.sanxiaoxing.cn` |
+| `ALLOWED_REFERERS` | 是 | 防盗链 Referer host 白名单（逗号分隔，填主域即可、子域自动命中）；**无内置默认**，未配置时所有带 Referer 的请求一律 403 |
 | `ALLOWED_ORIGINS` | 否 | CORS origin 白名单（逗号分隔），缺省由 ALLOWED_REFERERS 推导 `https://host` |
 | `ALLOW_EMPTY_REFERER` | 否 | 无 Referer 请求是否放行，默认 `1`（放行；地址栏直开 / 桌面端预览 / curl 不受影响） |
 | `CACHE_TTL_SECONDS` | 否 | Cache API 缓存秒数，默认 `86400`（1 天） |
