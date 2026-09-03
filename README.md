@@ -9,7 +9,7 @@ Assets Studio 是 SanXiaoXing Studio 的第一个模块，面向内容创作者�
         → 生成访问 URL → 复制链接（URL / Markdown）→ 系统轻提示
 ```
 
-图片读取由 **R2 自定义域名（CDN）** 直接提供，不经过 Worker；Worker 只做带鉴权的存储网关（上传 / 列表 / 删除 / 统计）。
+图片读取由独立的 **Image Edge Worker**（Referer 防盗链 + CORS）提供，绑定图片域名公开读取；API Worker 只做带鉴权的存储网关（上传 / 列表 / 删除 / 统计）。
 
 当前版本：`0.1.0-beta`。
 
@@ -48,16 +48,18 @@ Assets Studio 是 SanXiaoXing Studio 的第一个模块，面向内容创作者�
                   │  HTTP（reqwest，X-API-Key 鉴权）
                   ▼
       ┌─────────────────────────────┐
-      │    Cloudflare Worker        │  仅存储网关，不做图片处理
+      │    API Worker               │  仅存储网关，不做图片处理
       │   (Storage Gateway)         │
       └─────────────────────────────┘
                   │  R2 Binding（IMAGES）
                   ▼
-              Cloudflare R2
-                  │
-                  ▼
-        R2 自定义域名（CDN 公开读取）
-                  │
+              Cloudflare R2（私有桶）
+                  ▲
+                  │  R2 Binding（IMAGES）
+      ┌─────────────────────────────┐
+      │    Image Edge Worker        │  公开读图 + Referer 防盗链 + CORS
+      └─────────────────────────────┘
+                  │  GET/HEAD /{key}（图片域名，如 img.example.com）
                   ▼
         复制链接（URL / Markdown）到剪贴板
 ```
@@ -66,7 +68,7 @@ Assets Studio 是 SanXiaoXing Studio 的第一个模块，面向内容创作者�
 
 - 业务逻辑在 Rust（commands → services），前端只做展示，无图片字节 / HTTP / Base64
 - Worker 是 **Storage Gateway 而非 Image Gateway**：只负责上传、删除、列表、统计与鉴权；压缩、格式拼接、Base64 都在客户端完成
-- **双域名分离**：API 域名（Worker，需 `X-API-Key`）与图片域名（R2 自定义域，公开读取）分离——别人能看图，但不能借用你的 Worker 上传
+- **双 Worker 分离**：API 域名（API Worker，需 `X-API-Key`）与图片域名（Image Edge Worker，公开读取 + Referer 防盗链）分离——别人能看图，但不能借用你的 Worker 上传，也不能跨站盗链消耗流量（详见 [DECISIONS.md](docs/DECISIONS.md) D-008）
 
 ### 数据流（一次完整上传）
 
@@ -112,8 +114,9 @@ assets-studio/
 │       │   ├── delete.rs         # DELETE /objects/{key}（404 视为幂等删除）
 │       │   └── usage.rs          # GET /usage / POST /usage/rescan
 │       └── error.rs              # AppError 统一错误类型
-├── apps/worker/                  # Cloudflare Worker（单文件纯 JS）
-│   └── src/index.js              # Storage Gateway v2，部署页源码与其保持同一份
+├── apps/worker/                  # Cloudflare Workers（单文件纯 JS）
+│   ├── src/index.js              # API Worker：Storage Gateway v2（上传/列表/删除/统计/鉴权）
+│   └── src/image-edge.js         # Image Edge Worker：公开读图 + Referer 防盗链 + CORS（D-008）
 ├── docs/                         # 中文设计文档（PRD / 架构 / API / ADR / 设计稿）
 ├── assets/                       # 品牌图标
 ├── index.html
@@ -154,7 +157,7 @@ assets-studio/
 | 桌面框架 | Tauri 2 |
 | 前端 | Vanilla TypeScript + Vite 6 + Tailwind CSS 4 |
 | 后端 | Rust（`image`、`webp`、`reqwest`、`serde`） |
-| 存储 | Cloudflare Worker + R2（单文件纯 JS） |
+| 存储 | Cloudflare Workers（API + Image Edge）+ R2（单文件纯 JS） |
 | 插件 | dialog（文件选择）、window-state（窗口记忆）、opener |
 
 ## 快速开始
@@ -179,20 +182,32 @@ cargo test           # Rust 侧测试（在 src-tauri/ 下）
 
 ## 部署 Worker
 
-应用「设置 → 部署 Worker」页内置完整图文步骤，全程在 Cloudflare 控制台用鼠标完成，无需命令行：
+应用「设置 → 部署 Worker」页内置完整图文步骤（含两份可一键复制的源码），全程在 Cloudflare 控制台用鼠标完成，无需命令行。共需部署**两个 Worker**（同一 R2 桶，桶保持私有）：
 
-1. 创建 R2 存储桶，并添加**自定义域名**（图片域名，如 `img.example.com`）用于公开读取
-2. `dash.cloudflare.com` → Workers & Pages → 创建 Worker → 粘贴内置源码（与 `apps/worker/src/index.js` 一致）
-3. 添加环境变量（见下），并把 R2 存储桶绑定到 `IMAGES`
+1. 创建 R2 存储桶（如 `tools-studio`），**不加公开自定义域**
+2. 创建 **API Worker**：粘贴 `apps/worker/src/index.js`（Storage Gateway）→ 填 API Worker 环境变量（见下）→ R2 绑定到 `IMAGES`
+3. 创建 **Image Edge Worker**：粘贴 `apps/worker/src/image-edge.js`（防盗链读图）→ 填 Image Edge Worker 环境变量（见下）→ R2 绑定到 `IMAGES`
+4. 给 Image Edge Worker 添加**自定义域名**（图片域名，如 `img.example.com`）——原 R2 自定义域需先移除，否则可绕过 Worker 直读 R2
+
+### API Worker 环境变量
 
 | 变量 | 必填 | 说明 |
 |---|---|---|
 | `API_KEY` | 是 | 共享密钥，类型选「机密」，与客户端设置页的 API Key 一致（可在设置页点「生成随机」） |
-| `PUBLIC_BASE_URL` | 是 | **图片域名**（R2 自定义域，如 `https://img.example.com`，结尾无斜杠），不是 API 域名 |
+| `PUBLIC_BASE_URL` | 是 | **图片域名**（Image Edge Worker 自定义域，如 `https://img.example.com`，结尾无斜杠），不是 API 域名 |
 | `ALLOWED_TYPES` | 否 | Content-Type 白名单，默认 `image/png,image/jpeg,image/webp,image/gif,image/avif` |
 | `MAX_SIZE_MB` | 否 | 单文件上限（MB），默认 20 |
 
-部署完成后，在应用「设置」页填写 Worker 地址（API 域名）与 API Key 即可使用。
+### Image Edge Worker 环境变量
+
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `ALLOWED_REFERERS` | 否 | 防盗链 Referer host 白名单（逗号分隔，含子域匹配），默认 `sanxiaoxing.cn,www.sanxiaoxing.cn` |
+| `ALLOWED_ORIGINS` | 否 | CORS origin 白名单（逗号分隔），缺省由 ALLOWED_REFERERS 推导 `https://host` |
+| `ALLOW_EMPTY_REFERER` | 否 | 无 Referer 请求是否放行，默认 `1`（放行；地址栏直开 / 桌面端预览 / curl 不受影响） |
+| `CACHE_TTL_SECONDS` | 否 | Cache API 缓存秒数，默认 `86400`（1 天） |
+
+部署完成后，在应用「设置」页填写 API 域名与 API Key 即可使用。上传返回的图片 URL 仍为「图片域名 + key」，历史链接无需修改。
 
 ## 配置
 

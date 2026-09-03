@@ -232,3 +232,31 @@ Worker 职责：
 - 不做 Worker 代理读取 fallback
 - Worker 直接返回 full URL（含域名），客户端不需要拼接 `baseUrl`
 - Config 删除 `baseUrl` 字段
+
+---
+
+## Decision-008: 新增独立 Image Edge Worker 承担公开读图（防盗链）
+
+**背景：** 图片经 R2 自定义域名公开直读（D-007），无任何访问控制：任意站点可盗链 `<img>` 引用图片，持续消耗 Cloudflare 与 R2 流量。需要防盗链但不破坏历史 URL、不改动 API Worker 与客户端（Issue #1）。
+
+**决策：** 新增**独立 Image Edge Worker**（`apps/worker/src/image-edge.js`），图片域名从 R2 自定义域名改绑本 Worker；公开读图统一经此 Worker 转发至 R2，并施加访问控制。D-007 的「API Worker 是纯 Storage Gateway」保持成立——图片读取不属于 API Worker，而归**独立**的 Image Edge Worker，职责更单一、互不影响部署。
+
+- API Worker（`src/index.js`）**零改动**：仍负责 PUT/DELETE/HEAD/GET 列表与 usage，全请求 `X-API-Key`。
+- Image Edge Worker：仅 `GET` / `HEAD` / `OPTIONS`，公开读图，路径即 key（与历史 URL 同构），**Referer 防盗链** + **CORS 白名单** + Cache API 缓存。
+- R2 桶**关闭公开访问**（删除自定义域名绑定），只允许 Worker 经 `IMAGES` binding 读取，杜绝绕过 Worker 直连 R2。
+- Referer 规则：有 Referer 须命中白名单（精确或子域匹配）；**无 Referer 默认放行**（地址栏直开、隐私模式、桌面端预览、curl 等正常场景不受影响，Issue #1 明示）。
+- 预留扩展：`/public/*`（Referer 防盗链，兼容旧链接）与 `/private/*`（Token / 签名 URL）路径分支，本期不启用。
+
+**理由：**
+- R2 自定义域名无法执行 Referer/Origin 校验，防盗链必然要求读图路径经过 Worker
+- 独立 Worker 而非并入 API Worker：图片是低信任公开流量，API 是高信任私有流量，同进程会相互拖累（读图打满会挤占上传），分开部署各自扩展
+- 图片域名 hostname 不变（仅从 R2 自定义域改为 Worker 自定义域），历史 URL / Markdown / 客户端零修改
+- 纯图片读取 + 白名单 + 缓存，无状态、无图片处理逻辑，守住 D-007 的职责边界
+- 限流 / WAF / Token 等更严格防御留到后续（避免过度设计，遵循 WORKER-V2 §9 同款取舍）
+
+**影响：**
+- 新增源码 `apps/worker/src/image-edge.js`（单文件，控制台可粘贴部署）
+- 部署变化：图片域名改绑 Image Edge Worker；R2 桶删除自定义域并关闭公开访问（README / 设置页部署向导 / API.md §12 同步更新）
+- 新环境变量：`ALLOWED_REFERERS`、`ALLOWED_ORIGINS`、`ALLOW_EMPTY_REFERER`、`CACHE_TTL_SECONDS`（API.md §12.4）
+- 新端点契约：`GET`/`HEAD /{key}` 公开读图 + 403/404/400/405 语义（API.md §12）
+- 修订 D-007 影响项「必须绑定 R2 自定义域名 / 不做 Worker 代理读取 fallback」：图片分发不再直连 R2，改经 Image Edge Worker（API Worker 本身仍不代理图片）

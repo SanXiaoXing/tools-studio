@@ -1,7 +1,7 @@
 # Assets Studio — API 契约文档
 
 > 本文档定义 Worker (Storage Gateway) 的 REST API 契约。
-> 架构原则：Worker 只负责对象存储，不负责对象消费。详见 [DECISIONS.md](./DECISIONS.md) Decision-007。
+> 架构原则：API Worker 只负责对象存储，不负责对象消费（Decision-007）；公开图片读取由独立 Image Edge Worker 提供（[§12](#12-image-edge-worker-公开读图契约)，Decision-008）。
 
 ---
 
@@ -11,7 +11,7 @@
 
 **认证方式:** 所有请求必须携带 `X-API-Key` 请求头。Worker 从环境变量 `API_KEY` 读取预期值进行比对。
 
-**内容分发:** 图片不通过 Worker 读取。R2 Bucket 绑定自定义域名后，图片通过 `https://images.yourdomain.com/{key}` 直接访问。
+**内容分发:** 图片不再由 R2 自定义域名直接公开访问，改经独立 **Image Edge Worker** 受控读取（见 [§12](#12-image-edge-worker-公开读图契约) / [DECISIONS.md](./DECISIONS.md) Decision-008）。历史 URL 形态不变：`https://{image-domain}/{key}`，如 `https://img.sanxiaoxing.cn/2026/07/07/Aj92KsP91L.webp`。
 
 ---
 
@@ -23,6 +23,8 @@
 | `GET` | `/objects` | ✅ | 列出 R2 中的对象 | v1.1 |
 | `DELETE` | `/objects/{key}` | ✅ | 删除 R2 中的对象 | v1.1 |
 | `HEAD` | `/objects/{key}` | ✅ | 检查对象是否存在 | v1.1 |
+
+> 上表为 **API Worker（Storage Gateway）** 端点，全部需 `X-API-Key`。公开图片读取（`GET` / `HEAD /{key}`）由 **Image Edge Worker** 提供，见 [§12](#12-image-edge-worker-公开读图契约)。
 
 ---
 
@@ -240,9 +242,9 @@ R2 本身支持最大 5TB 单对象，100MB 是 Worker 层面的保护性限制�
 
 ---
 
-## 10. CORS 配置
+## 10. API Worker CORS 配置
 
-Worker 需配置 CORS 头，允许 Desktop 客户端直接请求（如果未来有 Web 客户端）：
+本节针对 API Worker（Storage Gateway）。Worker 需配置 CORS 头，允许 Desktop 客户端直接请求（如果未来有 Web 客户端）：
 
 ```
 Access-Control-Allow-Origin: *
@@ -297,3 +299,61 @@ export type ErrorCode =
 ```
 
 Rust 侧通过 `serde` 序列化/反序列化，类型结构与此对应。v1 手动同步，不引入代码生成工具。
+
+---
+
+## 12. Image Edge Worker 公开读图契约
+
+> 独立 Worker（源码 `apps/worker/src/image-edge.js`），职责仅图片读取与访问控制（Referer 防盗链 + CORS 白名单 + Cache），不做上传/删除/统计（那些属 API Worker）。见 [DECISIONS.md](./DECISIONS.md) Decision-008。
+
+**Base URL:** `https://img.sanxiaoxing.cn`（图片域名，原 R2 自定义域名改绑本 Worker；R2 桶关闭公开访问，仅经 Worker 的 `IMAGES` binding 读取）
+
+### 12.1 端点（公开，无需 API Key）
+
+| Method | Path | 说明 |
+|---|---|---|
+| `GET` | `/{key}` | 读取图片（路径即 R2 key，历史 URL 形态不变） |
+| `HEAD` | `/{key}` | 元数据查询，不传输对象体 |
+| `OPTIONS` | 任意 | CORS 预检（按白名单回 204） |
+
+路径即 key，与 API Worker 上传侧校验一致（含路径穿越拒绝、图片扩展名白名单）；`_meta/` 前缀一律 404（防泄露 R2 用量元对象）。
+
+### 12.2 Referer 防盗链规则
+
+| 场景 | 结果 |
+|---|---|
+| 有 Referer 且 host 命中白名单（精确或子域） | `200` |
+| 有 Referer 但 host 不在白名单（第三方盗链） | `403` |
+| 无 Referer（地址栏直开 / 隐私模式 / 桌面端 / curl） | `200`（`ALLOW_EMPTY_REFERER=0` 时 `403`） |
+
+### 12.3 CORS
+
+- Origin 命中白名单才回 `Access-Control-Allow-Origin: <origin>`（附 `Vary: Origin`），供站点内 JS 跨域读取。
+- Origin 未命中：省略 ACAO 头（浏览器拦 JS 跨域读，不误伤 `<img>` 嵌入）。
+- `OPTIONS` 预检：白名单 Origin 回 `204` + ACAO；无 Origin 的 OPTIONS 回 `204` 不设 ACAO。
+
+### 12.4 环境变量
+
+| 变量 | 必填 | 说明 |
+|---|---|---|
+| `IMAGES`（binding） | 是 | R2 桶（与 API Worker 同一桶） |
+| `ALLOWED_REFERERS` | 否 | Referer host 白名单（逗号分隔，含子域匹配）；默认 `sanxiaoxing.cn,www.sanxiaoxing.cn` |
+| `ALLOWED_ORIGINS` | 否 | CORS origin 白名单（逗号分隔）；缺省由 ALLOWED_REFERERS 推导 `https://<host>` |
+| `ALLOW_EMPTY_REFERER` | 否 | 无 Referer 是否放行，默认 `1`（放行） |
+| `CACHE_TTL_SECONDS` | 否 | Cache API 缓存秒数，默认 `86400` |
+
+### 12.5 响应语义
+
+| Status | 场景 |
+|---|---|
+| `200` | 读取成功（Content-Type / ETag / Cache-Control 齐全） |
+| `400` | key 非法（字符 / 路径穿越 / 非图片扩展名） |
+| `403` | 防盗链拦截（Referer 不在白名单，或禁空 Referer 时无 Referer） |
+| `404` | 对象不存在，或 key 以 `_meta/` 开头 |
+| `405` | 非 GET / HEAD / OPTIONS |
+
+错误响应为 text/plain（非 JSON，公开端点不暴露内部错误码）。
+
+### 12.6 预留扩展
+
+Token / 签名 URL / URL 有效期可在本 Worker 内按路径前缀分支实现：`/public/*`（Referer 防盗链，兼容旧链接）与 `/private/*`（Token / 签名 URL 严格鉴权）。当前不启用。
