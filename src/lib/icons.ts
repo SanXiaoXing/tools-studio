@@ -11,6 +11,7 @@ const PATHS = {
   x: '<path d="M18 6L6 18M6 6l12 12"/>',
   code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
 } as const;
 
 const svg = (paths: string, size = 18): string =>
@@ -29,4 +30,5 @@ export const icon = {
   x: svg(PATHS.x, 16),
   code: svg(PATHS.code, 18),
   arrow: svg(PATHS.arrow, 15),
+  refresh: svg(PATHS.refresh, 17),
 } as const;

@@ -5,7 +5,7 @@ import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import { renderDeployView } from "./features/deploy/deployView";
 import type { ImageItem, ObjectItem, ObjectList, ViewName } from "./lib/types";
-import { basename, formatBytes, pad2 } from "./lib/utils";
+import { basename, errorMessage, formatBytes, pad2, showToast } from "./lib/utils";
 import { icon } from "./lib/icons";
 import { getSettings } from "./lib/settings";
 import { applyTheme } from "./lib/theme";
@@ -98,6 +98,17 @@ switchView("gallery"); // 初始视图：隐藏其余视图并高亮导航
 
 const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
 
+/** 图库页头右侧「刷新云端列表」按钮：云端同步仅在启动（缓存过期/为空）触发，
+ *  上传/删除之外缺少手动恢复入口（曾导致打包版长期停留在残缺列表），这里补齐。 */
+const refreshBtn = document.createElement("button");
+refreshBtn.type = "button";
+refreshBtn.title = "刷新云端图片列表";
+refreshBtn.setAttribute("aria-label", refreshBtn.title);
+refreshBtn.className =
+  "ml-auto self-center flex items-center justify-center w-8 h-8 rounded-[10px] text-ink2 hover:bg-surface3 hover:text-ink transition shrink-0";
+refreshBtn.innerHTML = icon.refresh;
+galleryView.querySelector("header")!.appendChild(refreshBtn);
+
 /** ISO 时间 → "YYYY-MM-DD HH:mm"（本地时区），与上传列表日期格式一致 */
 function formatCloudDate(iso: string): string {
   const d = new Date(iso);
@@ -129,9 +140,17 @@ function isImageObject(o: ObjectItem): boolean {
   return IMAGE_EXTS.has(ext);
 }
 
-/** 启动时从云端拉取图片列表（API.md §4：GET /objects，分页合并），重启后仍能看到历史图片。
- *  失败（如未配置 Worker）时保留本地缓存（store 已从缓存恢复），不打扰用户。 */
-async function loadCloudGallery(): Promise<void> {
+/** 从云端拉取完整图片列表并写入 store（API.md §4：GET /objects 分页合并）。
+ *  启动同步与页头手动刷新共用；失败时保留本地现有数据（store 已从缓存恢复），
+ *  通过 toast 提示并恢复原列表，便于用户重试。 */
+let syncing = false;
+async function syncCloudGallery(): Promise<void> {
+  if (syncing) return;
+  syncing = true;
+  refreshBtn.disabled = true;
+  refreshBtn.classList.add("opacity-60", "pointer-events-none");
+  refreshBtn.title = "同步中…";
+  gallerySub.textContent = "正在同步云端…";
   try {
     const all: ObjectItem[] = [];
     let cursor: string | null = null;
@@ -147,10 +166,18 @@ async function loadCloudGallery(): Promise<void> {
     } while (cursor);
     // R2 列表按 key 升序（即时间正序）；倒序让最新图片排最前，与上传流程一致
     setItems(all.reverse().map(cloudItemToImageItem));
-  } catch {
-    /* 未配置 Worker 或拉取失败：保持空状态，不打扰 */
+    showToast(`已同步 ${all.length} 张图片`);
+  } catch (e) {
+    render(); // 恢复列表区域文案（同步失败不产生状态变更，这里不触发订阅）
+    showToast(`云端同步失败：${errorMessage(e)}`);
+  } finally {
+    syncing = false;
+    refreshBtn.disabled = false;
+    refreshBtn.classList.remove("opacity-60", "pointer-events-none");
+    refreshBtn.title = "刷新云端图片列表";
   }
 }
+refreshBtn.addEventListener("click", () => void syncCloudGallery());
 
 const modal = createModal({
   onCopy: (it, btn) => {
@@ -217,11 +244,13 @@ void getCurrentWebview().onDragDropEvent((event) => {
   }
 });
 
-// 数据同步就绪即渲染；缓存命中且未过期时直接使用本地数据（秒开、少读），
-// 仅当缓存缺失或超过有效期才拉取云端真实用量与图片列表（上传/删除会写回并续期缓存）
+// 数据同步就绪即渲染；缓存命中且未过期时直接使用本地数据（秒开、少读）。
+// 缓存缺失 / 超过有效期 / 本地没有任何图片时启动同步：最后一条保证首次同步
+// 失败的应用（如打包版在配置 Worker 前启动过）重启后能自动恢复云端列表，
+// 而不是停留在空列表直到 7 天缓存过期（上传/删除会写回并续期缓存）。
 subscribe(render);
 render();
-if (isCloudSyncNeeded()) {
+if (isCloudSyncNeeded() || getItems().length === 0) {
   void refreshCloudUsage();
-  void loadCloudGallery();
+  void syncCloudGallery();
 }
