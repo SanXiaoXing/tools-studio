@@ -2,6 +2,7 @@ import type { ImageItem } from "../../lib/types";
 import { formatContent, imgSrc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings, updateSettings } from "../../lib/settings";
+import { renderSlidingSeg } from "../../lib/seg";
 
 export interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
@@ -37,10 +38,7 @@ export function createModal(cb: ModalCallbacks): DetailModal {
         </dl>
         <div class="flex items-center justify-between">
           <span class="text-xs text-ink3">链接格式</span>
-          <div class="flex rounded-lg border border-line bg-surface2 p-0.5" role="group" aria-label="链接格式">
-            <button type="button" data-format="url" class="seg rounded-md px-3 py-1 text-xs font-medium transition">URL</button>
-            <button type="button" data-format="markdown" class="seg rounded-md px-3 py-1 text-xs font-medium transition">Markdown</button>
-          </div>
+          <div id="formatSegMount"></div>
         </div>
         <div>
           <label for="mLink" class="block text-xs text-ink3 mb-1.5">复制内容</label>
@@ -79,24 +77,20 @@ export function createModal(cb: ModalCallbacks): DetailModal {
     mDelete.textContent = "删除图片";
   };
 
-  const segBtns = Array.from(wrap.querySelectorAll<HTMLButtonElement>("[data-format]"));
-  const applySeg = (f: "url" | "markdown"): void => {
-    segBtns.forEach((b) => {
-      const active = b.getAttribute("data-format") === f;
-      b.classList.toggle("bg-surface", active);
-      b.classList.toggle("shadow-sm", active);
-      b.classList.toggle("text-ink", active);
-      b.classList.toggle("text-ink2", !active);
-    });
-  };
-  segBtns.forEach((b) =>
-    b.addEventListener("click", () => {
-      const f = b.getAttribute("data-format") as "url" | "markdown";
+  const formatSeg = renderSlidingSeg<"url" | "markdown">($<HTMLElement>("#formatSegMount"), {
+    options: [
+      { value: "url", label: "URL" },
+      { value: "markdown", label: "Markdown" },
+    ],
+    value: getSettings().copyFormat,
+    size: "sm",
+    // 两项文字长度不同（URL / Markdown），滑块按文字实际宽度自适应，不做等分
+    autoWidth: true,
+    onChange: (f) => {
       updateSettings({ copyFormat: f });
-      applySeg(f);
       if (current) mLink.value = formatContent(current);
-    }),
-  );
+    },
+  });
 
   const open = (it: ImageItem): void => {
     current = it;
@@ -110,7 +104,7 @@ export function createModal(cb: ModalCallbacks): DetailModal {
     mDate.textContent = it.date;
     mPath.textContent = it.path;
     mLink.value = formatContent(it);
-    applySeg(getSettings().copyFormat);
+    formatSeg.setValue(getSettings().copyFormat, { silent: true });
     mCopy.style.background = "";
     mCopy.innerHTML = icon.copy + "复制链接";
     wrap.hidden = false;

@@ -88,9 +88,9 @@ export function createTabBar(defs: TabDef[], onChange: (id: ViewName) => void): 
   };
 
   const el = document.createElement("div");
-  el.className = "tab-strip relative flex shrink-0 items-end px-3 pt-2 bg-surface2 select-none";
+  el.className = "tab-strip relative flex shrink-0 items-end pt-2 bg-surface2 select-none";
   el.innerHTML = `
-    <div class="tablist relative flex min-w-0 flex-1 items-end overflow-x-auto" role="tablist" aria-label="打开的视图"></div>
+    <div class="tablist relative flex min-w-0 flex-1 items-end overflow-x-auto overflow-y-hidden px-3" role="tablist" aria-label="打开的视图"></div>
   `;
   const tablist = el.querySelector<HTMLElement>(".tablist")!;
   /** 标签节点持久化：节点不随状态重建，FLIP / 进出场 / 拖拽 / 指示条才能连续动画 */
@@ -125,6 +125,18 @@ export function createTabBar(defs: TabDef[], onChange: (id: ViewName) => void): 
       ind.raf = requestAnimationFrame(tickIndicator);
     }
   };
+  /** 粘合动画：离开时轻微拉伸，到达时平滑吸附 */
+  const STICKY_MS = 220;
+  let stickyTimer = 0;
+  const triggerSticky = (): void => {
+    if (reducedMotion) return;
+    indicator.style.transformOrigin = "left bottom";
+    indicator.style.animation = `tab-sticky-leave ${STICKY_MS}ms cubic-bezier(0.32, 0.72, 0.24, 1)`;
+    window.clearTimeout(stickyTimer);
+    stickyTimer = window.setTimeout(() => {
+      indicator.style.animation = "";
+    }, STICKY_MS);
+  };
   /** 指示条平缓滑向目标槽位：随时可 retarget（以当前位置续接）；reduced-motion 直接就位 */
   const morphTo = (x: number, w: number): void => {
     if (!ind.ready || reducedMotion) {
@@ -144,6 +156,8 @@ export function createTabBar(defs: TabDef[], onChange: (id: ViewName) => void): 
       ind.running = true;
       ind.raf = requestAnimationFrame(tickIndicator);
     }
+    // 粘合效果：离开当前槽位时触发轻微拉伸动画
+    triggerSticky();
   };
 
   const TAB_BASE =
