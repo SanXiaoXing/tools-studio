@@ -8,7 +8,6 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
 
     // 窗口状态记忆（v2.tauri.app/plugin/window-state）：必须在窗口创建前注册到 Builder，

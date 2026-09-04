@@ -101,19 +101,20 @@ function showView(v: ViewName): void {
 // 标签条：状态持久化恢复（打开顺序 + 激活视图），首帧 onChange 完成初始视图切换
 const tabbar = createTabBar(TAB_DEFS, showView);
 
-// 应用外壳（sidebar.md 框架）：侧边栏 + 内容列（chrome 色底）＝ 标签条 + 圆角内容面板
+// 应用外壳（sidebar.md 框架）：侧边栏 + 内容列（chrome 色底）＝ 标签条 + 内容面板。
+// tab-strip 与 sheet 直接拼接，指示条向下延伸覆盖 sheet 左上圆角，形成统一容器轮廓。
 const content = document.createElement("main");
 content.className = "flex-1 min-w-0 flex flex-col overflow-hidden bg-surface2";
 content.appendChild(tabbar.el);
-const sheetWrap = document.createElement("div");
-sheetWrap.className = "relative flex-1 min-h-0 pr-3 pb-3 overflow-hidden";
 const sheet = document.createElement("section");
-sheet.className = "relative h-full rounded-xl bg-canvas shadow-card overflow-hidden flex flex-col";
-sheetWrap.appendChild(sheet);
-content.appendChild(sheetWrap);
+sheet.className = "relative flex-1 min-h-0 px-3 pb-3 pt-0 overflow-hidden";
+content.appendChild(sheet);
+const sheetInner = document.createElement("div");
+sheetInner.className = "relative h-full rounded-b-xl bg-canvas shadow-card overflow-hidden flex flex-col border border-line border-t-0";
+sheet.appendChild(sheetInner);
 app.appendChild(sidebarEl);
 app.appendChild(content);
-for (const v of Object.keys(views) as ViewName[]) sheet.appendChild(views[v]);
+for (const v of Object.keys(views) as ViewName[]) sheetInner.appendChild(views[v]);
 
 const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
 

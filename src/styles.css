@@ -157,18 +157,33 @@
   display: none;
 }
 
-/* 标签动画（sidebar.md 框架）：
-   激活指示条 = 与内容面板同色的「纸面」，位置由 JS 缓动补间逐帧驱动（style.left/width）；
-   标签节点持久化，进出场宽度动画由 JS 控制；无拖拽排序 */
+/* 标签条：无水平内边距，让指示条可以延伸到内容区左边缘 */
+.tab-strip {
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom: 1px solid transparent;
+}
+
+/* 标签指示条 = 内容面板同色「纸面」，向下延伸覆盖内容面板顶部圆角区域，
+   与面板共享左侧边框，形成连续轮廓。底部 padding 让指示条背景延伸到面板顶部，
+   覆盖面板的左上圆角；面板的 border-top 被移除以避免重叠边框。 */
 .tab-active-bg {
   position: absolute;
   top: 0;
-  bottom: 0;
-  left: 0;
+  bottom: -4px;           /* 向下延伸，覆盖面板顶部圆角 + 1px border 区域 */
+  left: -12px;            /* 对齐内容面板左边缘（tablist px-3 偏移量） */
   width: 0;
-  border-radius: 12px 12px 0 0; /* 与标签 rounded-t-xl 一致 */
+  border-radius: 12px 12px 0 0;
+  border-left: 1px solid var(--color-line);
+  border-right: 1px solid var(--color-line);
   background: var(--color-canvas);
   pointer-events: none;
+}
+/* 粘合动画：离开时拉伸 + 吸附时压缩 */
+@keyframes tab-sticky-leave {
+  0%   { transform: scaleX(1) scaleY(1); }
+  40%  { transform: scaleX(0.92) scaleY(1.15); }
+  100% { transform: scaleX(1) scaleY(1); }
 }
 /* 贴合并排：非激活标签之间用 1px 分隔线划分；末尾或紧邻激活标签（右侧）时不画，
    保证激活「纸面」与相邻标签之间无竖线（对齐文档 ChromeTab 分隔逻辑） */

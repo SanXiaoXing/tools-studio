@@ -26,7 +26,7 @@ export interface Sidebar {
 export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
   const el = document.createElement("aside");
   el.className =
-    "sidebar flex flex-col shrink-0 bg-surface2 border-r border-line overflow-hidden";
+    "sidebar flex flex-col shrink-0 bg-surface2 overflow-hidden";
   // 折叠宽度过渡由 styles.css 的 .sidebar 非分层规则声明（300ms cubic-bezier）
 
   let collapsed = false;
