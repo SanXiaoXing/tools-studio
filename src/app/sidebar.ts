@@ -2,6 +2,10 @@ import appIcon from "../assets/app-icon.png";
 import { icon } from "../lib/icons";
 import type { ViewName } from "../lib/types";
 import { formatBytes } from "../lib/utils";
+import { open } from "@tauri-apps/plugin-shell";
+import { getVersion } from "@tauri-apps/api/app";
+
+const GITHUB_URL = "https://github.com/SanXiaoXing/tools-studio";
 
 /** 导航仅保留视图切换项；上传入口统一为顶部 CTA（upload-cta），避免重复入口 */
 const NAV: Array<{ view: ViewName; label: string; icon: string }> = [
@@ -63,6 +67,10 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
         <div class="flex justify-between text-xs text-ink3 mb-2 whitespace-nowrap tnum"><span>已用空间</span><span class="storage-text">0 B / 10.0 GB</span></div>
         <div class="h-1 rounded-full bg-line overflow-hidden"><div class="storage-bar h-full rounded-full bg-accent" style="width:0%"></div></div>
       </div>
+      <div class="footer flex items-center justify-between px-2 pt-2 border-t border-line mt-1">
+        <span class="version-text text-[11px] text-ink3 whitespace-nowrap">v…</span>
+        <button class="github-link flex items-center justify-center w-7 h-7 rounded-lg text-ink3 hover:text-ink hover:bg-surface3 transition-colors" type="button" title="GitHub">${icon.github}</button>
+      </div>
     </div>`;
 
   const applyCollapsed = (now: boolean) => {
@@ -75,6 +83,9 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
       n.style.justifyContent = now ? "center" : "";
       n.style.padding = now ? "10px" : "";
     });
+    // 折叠时隐藏 GitHub 图标，仅显示版本号
+    const ghBtn = el.querySelector<HTMLElement>(".github-link");
+    if (ghBtn) ghBtn.hidden = now;
   };
   applyCollapsed(collapsed);
 
@@ -106,6 +117,11 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
       onNavigate("upload");
       return;
     }
+    const gh = (e.target as HTMLElement).closest(".github-link");
+    if (gh) {
+      void open(GITHUB_URL);
+      return;
+    }
     const cb = (e.target as HTMLElement).closest(".collapse-btn");
     if (cb) {
       toggleCollapsed();
@@ -124,6 +140,12 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
     storageBar.style.width = pct + "%";
   };
   setStorage(0); // 初始无图片：已用 0
+
+  // 异步获取版本号（来自 tauri.conf.json，与 Cargo.toml 同步）
+  void getVersion().then((v) => {
+    const span = el.querySelector<HTMLElement>(".version-text");
+    if (span) span.textContent = `v${v}`;
+  });
 
   return { el, navCount, setStorage };
 }
