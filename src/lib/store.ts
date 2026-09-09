@@ -114,11 +114,13 @@ export async function copyLink(
   }
 }
 
-/** 删除图片：先删远程 R2 对象，成功后才从本地列表移除（避免本地已删、远程残留） */
+/** 删除图片：先删远程 R2 对象，成功后才从本地列表移除（避免本地已删、远程残留）。
+ *  远程删除成功后顺带清理本地缩略图缓存（失败不影响删除流程）。 */
 export async function removeItem(it: ImageItem): Promise<void> {
   if (it.path) {
     try {
       await invoke("delete_image", { key: it.path });
+      await invoke("delete_thumbnail", { key: it.path }).catch(() => {});
     } catch (e) {
       showToast(`远程删除失败：${errorMessage(e)}`);
       return;

@@ -12,6 +12,25 @@ fn client() -> &'static reqwest::Client {
     HTTP.get_or_init(reqwest::Client::new)
 }
 
+/// 直接抓取公开 URL 的字节（缩略图下载原图用，不走 Worker 鉴权）。
+/// 带总超时：单张图网络卡死不能拖垮整批缩略图流水线（前端按 Channel 逐条上屏）。
+pub async fn fetch_bytes(url: &str) -> Result<Vec<u8>, AppError> {
+    let resp = client()
+        .get(url)
+        .timeout(std::time::Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|e| AppError::Io(format!("请求图片失败: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(AppError::Io(format!("获取图片失败 HTTP {}", resp.status())));
+    }
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| AppError::Io(format!("读取图片失败: {e}")))?;
+    Ok(bytes.to_vec())
+}
+
 /// 发送带 X-API-Key 的 Worker 请求并校验状态码。
 /// `path` 为 URL 路径（如 `/objects/{key}`、`/usage`）；`body` 为 (字节, Content-Type)，仅上传类请求传入。
 /// 统一配置校验与错误文案，避免各服务重复实现（upload.rs / usage.rs 共用）。

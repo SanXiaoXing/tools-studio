@@ -1,5 +1,6 @@
 import type { ImageItem } from "../../lib/types";
-import { esc, imgSrc } from "../../lib/utils";
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { esc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { copyLink, removeItem } from "../../lib/store";
 import { groupByPeriod, type PeriodGroup } from "./periods";
@@ -92,6 +93,9 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
     );
     sentinels.forEach((s) => observer!.observe(s));
   }
+
+  // 卡片缩略图填充：批量走 Rust 本地缓存，命中磁盘秒开，未命中后台下载生成
+  hydrateThumbs(tl);
 }
 
 /** 单个时间节点：折叠时只有标题行；展开时渲染卡片网格 + 加载哨兵 */
@@ -141,11 +145,54 @@ function onTimelineClick(e: MouseEvent, cb: GalleryCallbacks): void {
   onCardClick(e, cb);
 }
 
+/** get_thumbnails 命令经 Channel 单条回传的结果：path 为本地缩略图路径，空串表示生成失败 */
+interface ThumbRes {
+  key: string;
+  path: string;
+}
+
+/**
+ * 为展开节点的可见卡片填充缩略图：卡片渲染时不带 src（避免直接加载原图），
+ * 批量请求 Rust 本地缩略图缓存（命中磁盘路径 / 未命中下载生成）。
+ * 结果经 Channel 逐条回传——每完成一张立即上屏，慢图不阻塞已就绪的图；
+ * 单条失败（path 空）回退公开 URL，整批调用失败也回退。
+ * 重绘会替换 DOM，回传时只处理仍在文档中的 img，避免旧节点被误写。
+ */
+function hydrateThumbs(tl: HTMLElement): void {
+  const imgs = Array.from(tl.querySelectorAll<HTMLImageElement>("img[data-thumb]"));
+  if (imgs.length === 0) return;
+  const byKey = new Map<string, HTMLImageElement[]>();
+  const reqs = imgs.map((img) => {
+    const key = img.dataset.thumb ?? "";
+    const list = byKey.get(key);
+    if (list) list.push(img);
+    else byKey.set(key, [img]);
+    return { key, url: img.dataset.url ?? "" };
+  });
+  const apply = (key: string, path: string): void => {
+    for (const img of byKey.get(key) ?? []) {
+      if (!img.isConnected) continue;
+      img.src = path ? convertFileSrc(path) : img.dataset.url || "";
+    }
+  };
+  invoke("get_thumbnails", {
+    items: reqs,
+    onMessage: new Channel<ThumbRes>((res) => apply(res.key, res.path)),
+  }).catch((e) => {
+    console.error("[gallery] 缩略图批量获取失败，回退原图 URL:", e);
+    for (const key of byKey.keys()) apply(key, "");
+  });
+}
+
 function cardHTML(it: ImageItem, i: number): string {
   return `
   <article class="card group bg-surface border border-line rounded-xl p-2.5 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200" data-i="${i}">
     <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-surface2 cursor-zoom-in">
-      <img src="${imgSrc(it)}" alt="${esc(it.name)}" loading="lazy" class="w-full h-full object-cover">
+      ${
+        it.objectURL
+          ? `<img src="${esc(it.objectURL)}" alt="${esc(it.name)}" loading="lazy" decoding="async" class="w-full h-full object-cover">`
+          : `<img data-thumb="${esc(it.path)}" data-url="${esc(it.url ?? "")}" alt="${esc(it.name)}" decoding="async" class="w-full h-full object-cover">`
+      }
       <div class="overlay absolute inset-0 flex items-end p-2.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 bg-[linear-gradient(to_top,var(--color-overlay),transparent_35%)]">
         <div class="ov-actions flex items-center gap-1.5 w-full">
           <button class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-accent-strong text-white hover:bg-accent transition whitespace-nowrap" data-act="copy" type="button">${icon.copy}复制链接</button>

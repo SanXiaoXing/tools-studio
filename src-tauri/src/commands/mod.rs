@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
+use tauri::Manager;
+
 use crate::config::{self, ConfigState};
 use crate::error::AppError;
 use crate::services::compress;
 use crate::services::delete;
 use crate::services::list;
+use crate::services::thumbnail;
 use crate::services::upload;
 use crate::services::usage;
 
@@ -95,6 +98,37 @@ pub async fn list_images(
 ) -> Result<list::ObjectList, AppError> {
     let cfg = state.read().unwrap().clone();
     list::list_objects(&cfg.server, &cfg.api_key, limit, cursor).await
+}
+
+/// 批量获取图片缩略图：本地磁盘缓存（缓存目录/thumbs），命中直接返回本地路径，
+/// 未命中下载原图生成 480px WebP 落盘。网格卡片用缩略图渲染，避免加载原图。
+/// 结果经 Channel 逐条回传（on_message 接收）；path 为空串表示该条生成失败，
+/// 前端回退公开 URL。
+#[tauri::command]
+pub async fn get_thumbnails(
+    app: tauri::AppHandle,
+    items: Vec<thumbnail::ThumbReq>,
+    on_message: tauri::ipc::Channel<thumbnail::ThumbRes>,
+    state: tauri::State<'_, ConfigState>,
+) -> Result<(), AppError> {
+    let cfg = state.read().unwrap().clone();
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| AppError::Io(format!("解析缓存目录失败: {e}")))?
+        .join("thumbs");
+    thumbnail::get_batch(dir, items, (cfg.server, cfg.api_key), on_message).await
+}
+
+/// 删除某图片的缩略图缓存（图片被删除时调用），防止缓存残留死文件
+#[tauri::command]
+pub fn delete_thumbnail(app: tauri::AppHandle, key: String) -> Result<(), AppError> {
+    let dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| AppError::Io(format!("解析缓存目录失败: {e}")))?
+        .join("thumbs");
+    thumbnail::remove(&dir, &key)
 }
 
 /// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）

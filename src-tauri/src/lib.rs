@@ -44,6 +44,8 @@ pub fn run() {
             commands::sync_usage,
             commands::delete_image,
             commands::list_images,
+            commands::get_thumbnails,
+            commands::delete_thumbnail,
             commands::export_settings,
             commands::import_settings
         ])
