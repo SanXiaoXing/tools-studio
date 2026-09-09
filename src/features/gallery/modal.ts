@@ -1,5 +1,6 @@
 import type { ImageItem } from "../../lib/types";
-import { formatContent, imgSrc } from "../../lib/utils";
+import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { formatContent } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings, updateSettings } from "../../lib/settings";
 import { renderSlidingSeg } from "../../lib/seg";
@@ -7,6 +8,12 @@ import { renderSlidingSeg } from "../../lib/seg";
 export interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
   onConfirmDelete: (it: ImageItem) => void;
+}
+
+/** get_thumbnails 命令经 Channel 回传的单条结果：path 为本地缩略图路径，空串表示生成失败 */
+interface ThumbRes {
+  key: string;
+  path: string;
 }
 
 export interface DetailModal {
@@ -68,6 +75,32 @@ export function createModal(cb: ModalCallbacks): DetailModal {
 
   let current: ImageItem | null = null;
   let deleting = false;
+  /** 预览异步加载序号：连续打开不同图片时，旧请求的迟到回传不覆盖新预览 */
+  let previewSeq = 0;
+
+  /**
+   * 预览加载：本地 objectURL（刚上传，磁盘产物）直接使用；
+   * 云端恢复的图片走 get_thumbnails 本地缩略图缓存（命中磁盘秒开，未命中下载生成），
+   * 避免详情弹窗从网络加载原图；生成失败（path 空 / 整批出错）回退公开 URL。
+   */
+  const loadPreview = (it: ImageItem): void => {
+    if (it.objectURL) {
+      img.src = it.objectURL;
+      return;
+    }
+    const seq = ++previewSeq;
+    const key = it.path;
+    const fallback = it.url ?? "";
+    invoke("get_thumbnails", {
+      items: [{ key, url: fallback }],
+      onMessage: new Channel<ThumbRes>((res) => {
+        if (seq !== previewSeq || res.key !== key) return;
+        img.src = res.path ? convertFileSrc(res.path) : fallback;
+      }),
+    }).catch(() => {
+      if (seq === previewSeq) img.src = fallback;
+    });
+  };
 
   const resetDelete = (): void => {
     deleting = false;
@@ -95,7 +128,7 @@ export function createModal(cb: ModalCallbacks): DetailModal {
   const open = (it: ImageItem): void => {
     current = it;
     resetDelete();
-    img.src = imgSrc(it);
+    loadPreview(it);
     img.alt = it.name;
     title.textContent = it.name;
     mType.textContent = it.type;
