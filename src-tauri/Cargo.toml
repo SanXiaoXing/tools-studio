@@ -1,6 +1,6 @@
 [package]
 name = "assets_studio"
-version = "0.2.0-beta"
+version = "1.0.0"
 description = "A Tauri App"
 authors = ["SanXiaoXing"]
 edition = "2021"
