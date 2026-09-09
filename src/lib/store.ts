@@ -25,9 +25,33 @@ const emit = (): void => {
   for (const fn of listeners) fn();
 };
 
-/** 统一提交：持久化到本地缓存后再通知订阅者重绘（所有状态变更必须走这里） */
-const commit = (): void => {
+/**
+ * 缓存写入防抖（P0 规模优化）：连续上传/删除时每次 commit 都全量序列化写 localStorage
+ * 会随图片总量线性变慢，这里合并 500ms 内的多次变更只落盘一次；
+ * 窗口关闭 / 切到后台前 flush，避免丢失最后一次变更。
+ */
+let saveTimer: number | undefined;
+const persist = (): void => {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    saveTimer = undefined;
+    saveGalleryCache(items, cloudUsage);
+  }, 500);
+};
+const flushPersist = (): void => {
+  if (saveTimer === undefined) return;
+  window.clearTimeout(saveTimer);
+  saveTimer = undefined;
   saveGalleryCache(items, cloudUsage);
+};
+window.addEventListener("beforeunload", flushPersist);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushPersist();
+});
+
+/** 统一提交：调度缓存落盘（防抖）后立即通知订阅者重绘（所有状态变更必须走这里） */
+const commit = (): void => {
+  persist();
   emit();
 };
 

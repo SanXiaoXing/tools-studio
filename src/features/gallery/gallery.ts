@@ -2,28 +2,143 @@ import type { ImageItem } from "../../lib/types";
 import { esc, imgSrc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { copyLink, removeItem } from "../../lib/store";
+import { groupByPeriod, type PeriodGroup } from "./periods";
 
 export interface GalleryCallbacks {
   onDetail: (it: ImageItem) => void;
   onEmptyUpload: () => void;
 }
 
-const GRID_CLS =
-  "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 content-start " +
-  "p-5 pl-9 pr-9 pb-12 overflow-y-auto h-full";
+/**
+ * 图库渲染：时间轴 + 节点展开加载。
+ *
+ * 规模优化（图片总量持续增长时 DOM/内存不随总量线性膨胀）：
+ * 1. 按月份分桶（periods.ts）排成时间轴，月份节点默认折叠 —— 折叠节点只有一行标题，零卡片渲染；
+ * 2. 点击节点标题展开后才加载该月图片（首次展开渲染 CHUNK 张，滚动到底由哨兵分批追加）；
+ * 3. 最新月份默认自动展开（用户手动折叠后不打扰），旧月份无人为操作时保持折叠；
+ * 4. store 变更（上传/删除/同步）触发整体重绘时，保留各节点展开状态、已展开批次数与滚动位置。
+ */
+
+/** 每个展开节点的首批 / 每批追加渲染卡片数 */
+const CHUNK = 60;
+
+const TL_CLS = "gallery-tl h-full overflow-y-auto p-5 pl-9 pr-9 pb-12";
+const GRID_CLS = "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 content-start pt-3";
+
+// ---- 模块级视图状态：store 变更触发整体重绘时需要保留 ----
+/** 用户手动展开的节点 */
+const manualExpanded = new Set<string>();
+/** 用户手动折叠的节点（覆盖最新月份的自动展开） */
+const manualCollapsed = new Set<string>();
+/** 各节点已渲染的卡片数（哨兵分批追加进度） */
+const visibleMap = new Map<string, number>();
+let observer: IntersectionObserver | null = null;
+// 最近一次渲染的上下文，节点展开/折叠、哨兵追加时复用，无需经 store 重绘
+let ctx: { container: HTMLElement; items: ImageItem[]; cb: GalleryCallbacks } | null = null;
+// 当前渲染的分组（点击卡片时按节点 key 查找所属数组）
+let currentGroupsByKey = new Map<string, ImageItem[]>();
+let latestKey = "";
+
+/** 节点是否展开：手动展开优先；最新月份默认展开（除非被手动折叠） */
+const isExpanded = (key: string): boolean =>
+  manualExpanded.has(key) || (key === latestKey && !manualCollapsed.has(key));
 
 export function renderGallery(container: HTMLElement, items: ImageItem[], cb: GalleryCallbacks): void {
+  ctx = { container, items, cb };
   if (items.length === 0) {
+    manualExpanded.clear();
+    manualCollapsed.clear();
+    visibleMap.clear();
+    observer?.disconnect();
     renderEmpty(container, cb);
     return;
   }
-  container.innerHTML = `<div class="${GRID_CLS}">${items.map(cardHTML).join("")}</div>`;
-  const grid = container.firstElementChild as HTMLElement;
-  grid.addEventListener("click", (e) => onClick(e, items, cb));
-  grid.addEventListener("mouseleave", (e) => {
+
+  const groups = groupByPeriod(items);
+  latestKey = groups[0]?.key ?? "";
+  currentGroupsByKey = new Map(groups.map((g) => [g.key, g.items]));
+
+  // 重绘前记录滚动位置（展开/折叠、哨兵追加、store 变更共用同一渲染入口）
+  const prevScroll = container.querySelector<HTMLElement>(".gallery-tl")?.scrollTop ?? 0;
+
+  container.innerHTML = `
+  <div class="${TL_CLS}">
+    ${groups.map((g, gi) => sectionHTML(g, gi === groups.length - 1)).join("")}
+  </div>`;
+
+  const tl = container.querySelector<HTMLElement>(".gallery-tl")!;
+  tl.scrollTop = prevScroll;
+
+  // 事件只在新建的时间轴根元素上绑定一次（renderGallery 每次整体替换，无监听器叠加）
+  tl.addEventListener("click", (e) => onTimelineClick(e, cb));
+  tl.addEventListener("mouseleave", (e) => {
     const card = (e.target as HTMLElement).closest(".card") as HTMLElement | null;
     if (card) cancelConfirm(card);
   });
+
+  // 哨兵：所有展开节点共用一个 observer，滚动接近底部时给对应节点追加下一批
+  observer?.disconnect();
+  const sentinels = tl.querySelectorAll<HTMLElement>(".gallery-sentinel");
+  if (sentinels.length > 0) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.find((en) => en.isIntersecting);
+        if (!hit) return;
+        const key = (hit.target as HTMLElement).dataset.key ?? "";
+        visibleMap.set(key, (visibleMap.get(key) ?? CHUNK) + CHUNK);
+        if (ctx) renderGallery(ctx.container, ctx.items, ctx.cb);
+      },
+      { root: tl, rootMargin: "600px" },
+    );
+    sentinels.forEach((s) => observer!.observe(s));
+  }
+}
+
+/** 单个时间节点：折叠时只有标题行；展开时渲染卡片网格 + 加载哨兵 */
+function sectionHTML(g: PeriodGroup, isLast: boolean): string {
+  const expanded = isExpanded(g.key);
+  const vis = Math.min(visibleMap.get(g.key) ?? CHUNK, g.items.length);
+  return `
+  <section class="tl-sec relative pl-7 pb-2" data-key="${g.key}">
+    ${isLast ? "" : '<span class="absolute left-[5px] top-6 bottom-0 w-px bg-line" aria-hidden="true"></span>'}
+    <span class="absolute left-0 top-[15px] w-[11px] h-[11px] rounded-full border-2 border-canvas ${expanded ? "bg-accent" : "bg-ink3/40"}" aria-hidden="true"></span>
+    <button type="button" data-toggle="${g.key}" aria-expanded="${expanded}"
+      class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 -ml-2 text-left hover:bg-surface3 transition-colors">
+      <span class="text-ink3 transition-transform duration-200 ${expanded ? "" : "-rotate-90"}">${icon.chevron}</span>
+      <span class="text-[15px] font-semibold">${g.label}</span>
+      <span class="text-xs text-ink3 tnum">${g.items.length} 张</span>
+      ${expanded ? "" : '<span class="ml-auto text-xs text-ink3">展开加载</span>'}
+    </button>
+    ${
+      expanded
+        ? `<div class="${GRID_CLS}">
+            ${g.items
+              .slice(0, vis)
+              .map((it, i) => cardHTML(it, i))
+              .join("")}
+            ${g.items.length > vis ? `<div class="gallery-sentinel col-span-full flex items-center justify-center py-2 text-xs text-ink3" data-key="${g.key}">加载更多…</div>` : ""}
+          </div>`
+        : ""
+    }
+  </section>`;
+}
+
+/** 时间轴点击分发：节点标题 → 展开/折叠；卡片 → 复制/详情/删除 */
+function onTimelineClick(e: MouseEvent, cb: GalleryCallbacks): void {
+  const toggle = (e.target as HTMLElement).closest("[data-toggle]") as HTMLElement | null;
+  if (toggle) {
+    const key = toggle.dataset.toggle ?? "";
+    if (isExpanded(key)) {
+      manualExpanded.delete(key);
+      manualCollapsed.add(key);
+    } else {
+      manualExpanded.add(key);
+      manualCollapsed.delete(key);
+    }
+    if (ctx) renderGallery(ctx.container, ctx.items, ctx.cb);
+    return;
+  }
+  onCardClick(e, cb);
 }
 
 function cardHTML(it: ImageItem, i: number): string {
@@ -60,10 +175,12 @@ function cancelConfirm(card: HTMLElement): void {
   }
 }
 
-function onClick(e: MouseEvent, items: ImageItem[], cb: GalleryCallbacks): void {
+function onCardClick(e: MouseEvent, cb: GalleryCallbacks): void {
   const card = (e.target as HTMLElement).closest(".card") as HTMLElement | null;
   if (!card) return;
-  const it = items[Number(card.dataset.i)];
+  // 卡片 data-i 是其所属时间节点数组的下标，按所在 section 的 key 取出对应数组
+  const key = (card.closest("[data-key]") as HTMLElement | null)?.dataset.key ?? "";
+  const it = currentGroupsByKey.get(key)?.[Number(card.dataset.i)];
   if (!it) return; /* 骨架屏等未绑定数据的卡片 */
   const btn = (e.target as HTMLElement).closest("button[data-act]") as HTMLButtonElement | null;
   if (btn) {
