@@ -2,8 +2,8 @@ import type { QueueItem } from "../../lib/types";
 import { basename, errorMessage, esc, formatBytes, nowDate, readDims, showToast } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings } from "../../lib/settings";
-import { buildPath, sanitizeName, splitName } from "../../lib/naming";
-import { addItem, copyLink, refreshCloudUsage } from "../../lib/store";
+import { resolveUniquePath, sanitizeName, splitName } from "../../lib/naming";
+import { addItem, copyLink, getItems, refreshCloudUsage } from "../../lib/store";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { showConfirmUpload } from "./confirm";
@@ -23,7 +23,6 @@ export function renderUploadView(container: HTMLElement): UploadApi {
   const queue: QueueItem[] = [];
   let total = 0;
   let done = 0;
-  let seq = 0; // 队列内自增序号，同秒完成的多张图也能区分
 
   container.innerHTML = `
   <div class="upload-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
@@ -69,7 +68,7 @@ export function renderUploadView(container: HTMLElement): UploadApi {
     q.sizeAfter = formatBytes(outSize);
     q.dims = "读取中…";
     q.outputPath = outPath;
-    // 路径已在 processNext 中按模板生成（默认含 {YYYYMMDD}-{HHmmss}-{seq}）
+    // 路径已在 processNext 中按模板生成并去重（见 resolveUniquePath）
     const { base } = splitName(q.name);
     const newName = base + ".webp";
     const outUrl = convertFileSrc(outPath);
@@ -114,11 +113,14 @@ export function renderUploadView(container: HTMLElement): UploadApi {
           q.status = "正在上传";
           q.pct = 80;
           updateRow(q);
-          // 生成 R2 key（模板）并上传到 Worker → R2；server/apiKey 由 Rust 从 config.json 读取（WORKER-V2.md §7）
+          // 生成 R2 key（模板 + 去重）并上传到 Worker → R2；server/apiKey 由 Rust 从 config.json 读取（WORKER-V2.md §7）
           // 文件名先清洗：保留原文件名（nameMode=original 时模板 {name} 生效），非法字符替换为 -（naming.ts sanitizeName）
+          // 路径冲突：模板有 {seq} 则按当天已有数量续号，否则追加 -1/-2，避免同 key 覆盖
           const { base } = splitName(q.name);
           const safeBase = sanitizeName(base);
-          const path = buildPath(safeBase, "webp", undefined, ++seq);
+          const path = resolveUniquePath(safeBase, "webp", undefined, 1, (p) =>
+            queue.some((x) => x.path === p) || getItems().some((it) => it.path === p),
+          );
           q.path = path;
           // Tauri v2 命令参数：JS 端用驼峰命名（自动转 Rust 蛇形参数），
           // 必须用 contentType / filePath，不能写 content_type / file_path，否则报 invalid args。
@@ -146,7 +148,6 @@ export function renderUploadView(container: HTMLElement): UploadApi {
   };
 
   const addPaths = (paths: string[]): void => {
-    seq = 0; // 每批次重置序号：同一批内累加，新批次从 1 重新开始
     const files = paths.filter((p) => /\.(png|jpe?g|webp)$/i.test(p));
     if (files.length === 0) {
       showToast("未检测到支持的图片文件");

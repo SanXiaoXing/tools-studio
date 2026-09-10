@@ -77,6 +77,9 @@ export function createModal(cb: ModalCallbacks): DetailModal {
   let deleting = false;
   /** 预览异步加载序号：连续打开不同图片时，旧请求的迟到回传不覆盖新预览 */
   let previewSeq = 0;
+  /** 出场动画定时器：连续开关时取消上一次，避免过早 hidden 或残留类名 */
+  let closeTimer = 0;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
   /**
    * 预览加载：本地 objectURL（刚上传，磁盘产物）直接使用；
@@ -125,7 +128,15 @@ export function createModal(cb: ModalCallbacks): DetailModal {
     },
   });
 
+  const finishClose = (): void => {
+    wrap.classList.remove("modal-anim-in", "modal-anim-out");
+    wrap.hidden = true;
+    document.body.style.overflow = "";
+    current = null;
+  };
+
   const open = (it: ImageItem): void => {
+    window.clearTimeout(closeTimer);
     current = it;
     resetDelete();
     loadPreview(it);
@@ -140,14 +151,25 @@ export function createModal(cb: ModalCallbacks): DetailModal {
     formatSeg.setValue(getSettings().copyFormat, { silent: true });
     mCopy.style.background = "";
     mCopy.innerHTML = icon.copy + "复制链接";
+    wrap.classList.remove("modal-anim-out");
     wrap.hidden = false;
     document.body.style.overflow = "hidden";
+    if (!reducedMotion.matches) {
+      // 强制 reflow：从出场残留态重新打开时，保证进场动画重新触发
+      void wrap.offsetWidth;
+      wrap.classList.add("modal-anim-in");
+    }
   };
 
   const close = (): void => {
-    wrap.hidden = true;
-    document.body.style.overflow = "";
-    current = null;
+    window.clearTimeout(closeTimer);
+    if (reducedMotion.matches) {
+      finishClose();
+      return;
+    }
+    wrap.classList.remove("modal-anim-in");
+    wrap.classList.add("modal-anim-out");
+    closeTimer = window.setTimeout(finishClose, 170);
   };
 
   closeBtn.addEventListener("click", close);

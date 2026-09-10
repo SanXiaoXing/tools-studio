@@ -92,14 +92,18 @@ let toastTimer: number | undefined;
 export const showToast = (msg: string): void => {
   if (!toastEl) {
     toastEl = document.createElement("div");
+    // 只过渡 opacity/transform（DESIGN-SPEC §5），避免 transition-all 触发布局属性
     toastEl.className =
-      "fixed left-1/2 bottom-7 z-[60] -translate-x-1/2 translate-y-2 rounded-full px-4 py-2 text-[13px] font-medium shadow-modal opacity-0 transition-all duration-200 pointer-events-none";
+      "fixed left-1/2 bottom-7 z-[60] -translate-x-1/2 translate-y-2 rounded-full px-4 py-2 text-[13px] font-medium shadow-modal opacity-0 transition-[opacity,transform] duration-200 ease pointer-events-none";
     toastEl.style.background = "var(--color-ink)";
     toastEl.style.color = "var(--color-canvas)";
     document.body.appendChild(toastEl);
   }
   toastEl.textContent = msg;
   window.clearTimeout(toastTimer);
+  // 先摘掉可见态并强制 reflow：连续提示时从退场中段重新进场，不闪一下
+  toastEl.classList.remove("opacity-100", "translate-y-0");
+  void toastEl.offsetWidth;
   requestAnimationFrame(() => toastEl!.classList.add("opacity-100", "translate-y-0"));
   toastTimer = window.setTimeout(() => {
     toastEl!.classList.remove("opacity-100", "translate-y-0");

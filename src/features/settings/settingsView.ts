@@ -1,5 +1,5 @@
 import type { UsageInfo } from "../../lib/types";
-import { SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
+import { NAME_MODE_DEFAULT_TEMPLATES, SETTINGS_DEFAULTS, getSettings, parseConnectionBackup, parseSettingsBackup, updateSettings } from "../../lib/settings";
 import { renderThemeSeg } from "../../lib/theme";
 import { renderSlidingSeg } from "../../lib/seg";
 import { fillTemplate } from "../../lib/naming";
@@ -186,7 +186,7 @@ export function renderSettingsView(
         <div>
           <label class="block text-[13px] font-medium mb-1.5">命名方式</label>
           <div id="nameModeMount"></div>
-          <p class="${HINT_CLS}">自动命名生成「时间戳+序号」；保留原文件名则直接用图片原名（特殊字符自动替换为 <code class="${CODE_CLS}">-</code>）。</p>
+          <p class="${HINT_CLS}">自动命名生成「时间戳+序号」；保留原文件名则直接用图片原名（特殊字符自动替换为 <code class="${CODE_CLS}">-</code>）。两种方式各自记住路径模板，切换后再切回不会丢失自定义。</p>
         </div>
         <div>
           <label for="setPath" class="block text-[13px] font-medium mb-1.5">路径模板</label>
@@ -196,7 +196,8 @@ export function renderSettingsView(
             <code class="${CODE_CLS}">{YYYY}</code> 年、<code class="${CODE_CLS}">{MM}</code> 月、
             <code class="${CODE_CLS}">{DD}</code> 日、<code class="${CODE_CLS}">{YYYYMMDD}</code> 年月日、
             <code class="${CODE_CLS}">{HHmmss}</code> 时分秒、<code class="${CODE_CLS}">{seq}</code> 序号、
-            <code class="${CODE_CLS}">{name}</code> 文件名、<code class="${CODE_CLS}">{ext}</code> 扩展名
+            <code class="${CODE_CLS}">{name}</code> 文件名、<code class="${CODE_CLS}">{ext}</code> 扩展名。
+            路径与已有图片冲突时会自动续号或加后缀，不会覆盖旧图。
           </p>
         </div>
         <div class="preview-box flex items-center gap-3 mt-3.5 px-3 py-2.5 rounded-lg bg-surface2 text-xs tnum">
@@ -365,20 +366,25 @@ export function renderSettingsView(
     const dot = sample.lastIndexOf(".");
     const base = sample.slice(0, dot);
     const ext = sample.slice(dot + 1);
-    pathPreview.textContent = fillTemplate(setPath.value || SETTINGS_DEFAULTS.pathTemplate, base, ext, undefined, 1);
+    pathPreview.textContent = fillTemplate(setPath.value || NAME_MODE_DEFAULT_TEMPLATES[getSettings().nameMode], base, ext, undefined, 1);
   };
 
-  /** 非重要设置：路径模板失焦即自动保存（DESIGN-SPEC §3.4），无需底部保存按钮 */
+  /** 非重要设置：路径模板失焦即自动保存（DESIGN-SPEC §3.4），无需底部保存按钮。
+   *  同时写入当前命名方式的模板记忆，切换 mode 再切回时保留自定义。 */
   setPath.addEventListener("blur", () => {
-    const v = setPath.value.trim() || SETTINGS_DEFAULTS.pathTemplate;
-    if (v !== getSettings().pathTemplate) {
-      updateSettings({ pathTemplate: v });
+    const v = setPath.value.trim() || NAME_MODE_DEFAULT_TEMPLATES[getSettings().nameMode];
+    const s = getSettings();
+    if (v !== s.pathTemplate || v !== s.nameModeTemplates[s.nameMode]) {
+      updateSettings({
+        pathTemplate: v,
+        nameModeTemplates: { ...s.nameModeTemplates, [s.nameMode]: v },
+      });
       showToast("设置已保存");
     }
     updatePreview();
   });
   resetBtn.addEventListener("click", () => {
-    updateSettings({ ...SETTINGS_DEFAULTS });
+    updateSettings({ ...SETTINGS_DEFAULTS, nameModeTemplates: { ...SETTINGS_DEFAULTS.nameModeTemplates } });
     themeSeg.setTheme(SETTINGS_DEFAULTS.theme);
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     nameSeg.setValue(SETTINGS_DEFAULTS.nameMode, { silent: true });
@@ -397,13 +403,10 @@ export function renderSettingsView(
   });
   setPath.addEventListener("input", updatePreview);
 
-  /** 命名方式：自动命名（时间戳+序号）/ 保留原文件名（预设模板，保存后对新上传生效）。
+  /** 命名方式：自动命名（时间戳+序号）/ 保留原文件名（各自记忆路径模板）。
+   *  切换前把输入框内容写入当前 mode，切换后加载目标 mode 的已存模板（无则预设）。
    *  滑动动画与主题切换共用 renderSlidingSeg（seg.ts），交互一致。 */
   type NameMode = "auto" | "original";
-  const NAME_MODE_PRESETS: Record<NameMode, string> = {
-    auto: SETTINGS_DEFAULTS.pathTemplate,
-    original: "blog/{YYYY}/{MM}/{name}.{ext}",
-  };
   const nameSeg = renderSlidingSeg<NameMode>($<HTMLElement>("#nameModeMount"), {
     options: [
       { value: "auto", label: "自动命名" },
@@ -412,8 +415,19 @@ export function renderSettingsView(
     value: getSettings().nameMode,
     size: "sm", // 比主题切换更紧凑
     onChange: (mode) => {
-      updateSettings({ nameMode: mode, pathTemplate: NAME_MODE_PRESETS[mode] });
-      setPath.value = NAME_MODE_PRESETS[mode];
+      const prev = getSettings();
+      // 先记住当前模式下输入框里的模板（可能尚未 blur 保存）
+      const currentTemplate = setPath.value.trim() || prev.pathTemplate;
+      const templates = { ...prev.nameModeTemplates, [prev.nameMode]: currentTemplate };
+      // 目标模式：优先已记忆的自定义模板，否则预设
+      const nextTemplate = templates[mode] || NAME_MODE_DEFAULT_TEMPLATES[mode];
+      templates[mode] = nextTemplate;
+      updateSettings({
+        nameMode: mode,
+        pathTemplate: nextTemplate,
+        nameModeTemplates: templates,
+      });
+      setPath.value = nextTemplate;
       updatePreview();
       showToast(mode === "original" ? "已切换为保留原文件名" : "已切换为自动命名");
     },

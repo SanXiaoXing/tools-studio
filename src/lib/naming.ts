@@ -25,6 +25,45 @@ export const fillTemplate = (template: string, name: string, ext: string, date?:
 export const buildPath = (name: string, ext: string, date?: Date, seq = 1): string =>
   fillTemplate(getSettings().pathTemplate, name, ext, date, seq);
 
+/**
+ * 生成不会覆盖已有对象的 R2 key。
+ * - 模板含 {seq}：从 seedSeq 起递增，直到路径未被占用（跨批次也能按当天已有数量续号）。
+ * - 模板不含 {seq}：若整路径冲突，在扩展名前追加 -1、-2…。
+ * isTaken 应返回「图库已有路径」或「本批次已分配路径」。
+ */
+export const resolveUniquePath = (
+  name: string,
+  ext: string,
+  date?: Date,
+  seedSeq = 1,
+  isTaken?: (path: string) => boolean,
+): string => {
+  const template = getSettings().pathTemplate;
+  const d = date || new Date();
+  const fill = (seq: number): string => fillTemplate(template, name, ext, d, seq);
+
+  if (!isTaken) return fill(seedSeq);
+
+  if (template.includes("{seq}")) {
+    for (let s = seedSeq; s < seedSeq + 9999; s++) {
+      const p = fill(s);
+      if (!isTaken(p)) return p;
+    }
+    return fill(seedSeq);
+  }
+
+  const base = fill(seedSeq);
+  if (!isTaken(base)) return base;
+  const stem = base.toLowerCase().endsWith(`.${ext.toLowerCase()}`)
+    ? base.slice(0, -(ext.length + 1))
+    : base;
+  for (let n = 1; n < 9999; n++) {
+    const p = `${stem}-${n}.${ext}`;
+    if (!isTaken(p)) return p;
+  }
+  return base;
+};
+
 /** 拆分文件名主体与扩展名 */
 export const splitName = (name: string): { base: string; ext: string } => {
   const dot = name.lastIndexOf(".");

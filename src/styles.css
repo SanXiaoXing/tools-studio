@@ -109,7 +109,7 @@
    transition-[width] 会被其覆盖），width 需在这里单独声明才会真正过渡。 */
 .sidebar {
   transition-property: width;
-  transition-duration: 300ms;
+  transition-duration: 280ms;
   transition-timing-function: cubic-bezier(0.32, 0.72, 0.24, 1);
 }
 
@@ -314,6 +314,37 @@
 @keyframes overlay-breathe {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.07); }
+}
+
+/* 详情弹窗进出场（DESIGN-SPEC §5：只动 transform/opacity）：
+   背景淡入淡出；面板轻微缩放+上浮，Apple 式克制感。 */
+.modal-anim-in {
+  animation: modal-bg-in 200ms ease-out;
+}
+.modal-anim-in > [role="dialog"] {
+  animation: modal-panel-in 200ms cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+.modal-anim-out {
+  animation: modal-bg-out 160ms ease-in forwards;
+}
+.modal-anim-out > [role="dialog"] {
+  animation: modal-panel-out 160ms ease-in forwards;
+}
+@keyframes modal-bg-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modal-bg-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes modal-panel-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: scale(0.97) translateY(4px); }
 }
 
 /* 刻度滑块（elasticSlider.ts）：shadcn 风格外观（8px 轨道 + 数值气泡 + 刻度） */

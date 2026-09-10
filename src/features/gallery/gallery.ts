@@ -186,7 +186,7 @@ function hydrateThumbs(tl: HTMLElement): void {
 
 function cardHTML(it: ImageItem, i: number): string {
   return `
-  <article class="card group bg-surface border border-line rounded-xl p-2.5 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200" data-i="${i}">
+  <article class="card group bg-surface border border-line rounded-xl p-2.5 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200 ease" data-i="${i}">
     <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-surface2 cursor-zoom-in">
       ${
         it.objectURL

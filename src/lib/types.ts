@@ -26,6 +26,11 @@ export interface Settings {
   theme: "system" | "dark" | "light";
   /** 存储文件名策略：auto=自动命名（时间戳+序号），original=保留图片原文件名 */
   nameMode: "auto" | "original";
+  /** 各命名方式各自记住最近一次使用的路径模板；切换 mode 时恢复对应模板，不互相覆盖 */
+  nameModeTemplates: {
+    auto: string;
+    original: string;
+  };
 }
 
 /** 上传队列项 */

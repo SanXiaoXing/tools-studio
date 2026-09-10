@@ -1,21 +1,45 @@
 import type { Settings } from "./types";
 
+/** 命名方式默认预设模板：切换 mode 时若该 mode 尚无自定义记录则使用这些 */
+export const NAME_MODE_DEFAULT_TEMPLATES: Settings["nameModeTemplates"] = {
+  auto: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
+  original: "blog/{YYYY}/{MM}/{name}.{ext}",
+};
+
 /** 默认设置（DESIGN-SPEC §1 / DESIGN.md §5.3）；连接信息（server/apiKey）在 Rust config.json */
 export const SETTINGS_DEFAULTS: Settings = {
   domain: "https://cdn.assets-studio.dev",
-  pathTemplate: "blog/{YYYY}/{MM}/{YYYYMMDD}-{HHmmss}-{seq}.{ext}",
+  pathTemplate: NAME_MODE_DEFAULT_TEMPLATES.auto,
   copyFormat: "url",
   quality: 80,
   theme: "system",
   nameMode: "auto",
+  nameModeTemplates: { ...NAME_MODE_DEFAULT_TEMPLATES },
 };
+
+/** 旧版备份/本地存储缺 nameModeTemplates 时：当前 mode 用现行 pathTemplate，另一 mode 用预设 */
+function withNameModeTemplates(merged: Settings, rawTemplates?: Settings["nameModeTemplates"]): Settings {
+  if (rawTemplates && typeof rawTemplates.auto === "string" && typeof rawTemplates.original === "string") {
+    return { ...merged, nameModeTemplates: rawTemplates };
+  }
+  return {
+    ...merged,
+    nameModeTemplates: {
+      ...NAME_MODE_DEFAULT_TEMPLATES,
+      [merged.nameMode]: merged.pathTemplate || NAME_MODE_DEFAULT_TEMPLATES[merged.nameMode],
+    },
+  };
+}
 
 let settings: Settings = load();
 
 function load(): Settings {
   try {
     const raw = localStorage.getItem("as-settings");
-    return raw ? { ...SETTINGS_DEFAULTS, ...JSON.parse(raw) } : { ...SETTINGS_DEFAULTS };
+    if (!raw) return { ...SETTINGS_DEFAULTS };
+    const data = JSON.parse(raw) as Partial<Settings>;
+    const merged: Settings = { ...SETTINGS_DEFAULTS, ...data };
+    return withNameModeTemplates(merged, data.nameModeTemplates);
   } catch {
     return { ...SETTINGS_DEFAULTS };
   }
@@ -45,7 +69,7 @@ export const parseSettingsBackup = (raw: string): Settings | null => {
     if (typeof merged.quality !== "number" || merged.quality < 1 || merged.quality > 100) return null;
     if (merged.theme !== "system" && merged.theme !== "dark" && merged.theme !== "light") return null;
     if (merged.nameMode !== "auto" && merged.nameMode !== "original") return null;
-    return merged;
+    return withNameModeTemplates(merged, data.nameModeTemplates);
   } catch {
     return null;
   }
