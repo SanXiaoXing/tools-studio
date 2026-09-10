@@ -11,7 +11,7 @@ Assets Studio 是 SanXiaoXing Studio 的第一个模块，面向内容创作者�
 
 图片读取由 **R2 自定义域名（CDN）** 直接提供，不经过 Worker；Worker 只做带鉴权的存储网关（上传 / 列表 / 删除 / 统计）。
 
-当前版本：`0.1.0-beta`。
+当前版本：`1.0.1`。
 
 ---
 
