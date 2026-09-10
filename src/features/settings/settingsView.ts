@@ -340,7 +340,7 @@ export function renderSettingsView(
   );
 
   /** 主题：三选一（跟随系统 / 深色 / 浅色），点击即保存并应用；选中态由滑动指示器表示。
-   *  渲染与事件在 theme.ts 内；setTheme 供恢复默认 / 导入备份同步。 */
+   *  渲染与事件在 theme.ts 内；setValue 供恢复默认 / 导入备份同步。 */
   const themeSeg = renderThemeSeg($("#themeMount"));
 
   /** 压缩质量的当前值（未保存也实时），松手后写入设置模型 */
@@ -385,7 +385,7 @@ export function renderSettingsView(
   });
   resetBtn.addEventListener("click", () => {
     updateSettings({ ...SETTINGS_DEFAULTS, nameModeTemplates: { ...SETTINGS_DEFAULTS.nameModeTemplates } });
-    themeSeg.setTheme(SETTINGS_DEFAULTS.theme);
+    themeSeg.setValue(SETTINGS_DEFAULTS.theme);
     setPath.value = SETTINGS_DEFAULTS.pathTemplate;
     nameSeg.setValue(SETTINGS_DEFAULTS.nameMode, { silent: true });
     quality = SETTINGS_DEFAULTS.quality;
@@ -476,7 +476,7 @@ export function renderSettingsView(
           conn = { server: connBackup.server, apiKey: connBackup.apiKey };
         }
         updateSettings(parsed);
-        themeSeg.setTheme(parsed.theme);
+        themeSeg.setValue(parsed.theme);
         setPath.value = parsed.pathTemplate;
         nameSeg.setValue(parsed.nameMode, { silent: true });
         quality = parsed.quality;

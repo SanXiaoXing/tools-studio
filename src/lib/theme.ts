@@ -16,16 +16,11 @@ themeMedia.addEventListener("change", () => {
   if (getSettings().theme === "system") applyTheme("system");
 });
 
-export interface ThemeSeg {
-  /** 设置主题：保存到 settings + 应用到 <html> + 同步滑动指示器（按钮点击与外部同步共用） */
-  setTheme: (t: Settings["theme"]) => void;
-}
-
 /** 主题三选 segment：滑动指示器（spring 动画）+ 文字高亮，点击即保存并应用。
- *  渲染到传入容器；返回 setTheme 供外部同步（恢复默认 / 导入备份）。
+ *  返回 renderSlidingSeg 的 setValue，供外部同步（恢复默认 / 导入备份）。
  *  滑动动画与设置页「命名方式」共用 renderSlidingSeg（seg.ts），交互一致。 */
-export function renderThemeSeg(container: HTMLElement): ThemeSeg {
-  const seg = renderSlidingSeg<Settings["theme"]>(container, {
+export function renderThemeSeg(container: HTMLElement) {
+  return renderSlidingSeg<Settings["theme"]>(container, {
     options: [
       { value: "system", label: "跟随系统" },
       { value: "dark", label: "深色" },
@@ -37,5 +32,4 @@ export function renderThemeSeg(container: HTMLElement): ThemeSeg {
       applyTheme(t);
     },
   });
-  return { setTheme: (t) => seg.setValue(t) };
 }

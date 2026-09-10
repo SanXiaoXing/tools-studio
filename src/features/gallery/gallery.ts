@@ -5,7 +5,7 @@ import { icon } from "../../lib/icons";
 import { copyLink, removeItem } from "../../lib/store";
 import { groupByPeriod, type PeriodGroup } from "./periods";
 
-export interface GalleryCallbacks {
+interface GalleryCallbacks {
   onDetail: (it: ImageItem) => void;
   onEmptyUpload: () => void;
 }

@@ -15,7 +15,7 @@ export interface TabDef {
   icon: string;
 }
 
-export interface TabBarApi {
+interface TabBarApi {
   /** 标签条根元素，由调用方放入内容区顶部 */
   el: HTMLElement;
   /** 打开视图：不存在则追加标签并激活，已存在仅激活（导航 / CTA / 拖拽共用入口） */

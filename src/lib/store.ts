@@ -56,7 +56,6 @@ const commit = (): void => {
 };
 
 export const getItems = (): ImageItem[] => items;
-export const getCloudUsage = (): number | null => cloudUsage;
 
 /** 启动时是否需要拉取云端：缓存缺失或已过期才同步；命中新鲜缓存则直接用（减少每次启动的 GET） */
 export const isCloudSyncNeeded = (): boolean => isGalleryCacheStale(cached);
@@ -71,10 +70,6 @@ export const setItems = (next: ImageItem[]): void => {
 };
 export const addItem = (it: ImageItem): void => {
   items = [it, ...items];
-  commit();
-};
-export const removeLocalItem = (it: ImageItem): void => {
-  items = items.filter((x) => x !== it);
   commit();
 };
 export const setCloudUsage = (n: number | null): void => {

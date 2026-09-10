@@ -21,10 +21,10 @@ export interface PeriodGroup {
 const MONTH_RE = /^\d{4}-\d{2}/;
 
 /** 从格式化日期中提取月份桶 key；非法日期归入 "unknown" */
-export const periodKeyOf = (date: string): string => (MONTH_RE.test(date) ? date.slice(0, 7) : "unknown");
+const periodKeyOf = (date: string): string => (MONTH_RE.test(date) ? date.slice(0, 7) : "unknown");
 
 /** 月份桶 key → 中文展示文案 */
-export const periodLabel = (key: string): string => {
+const periodLabel = (key: string): string => {
   if (key === "unknown") return "未知时间";
   const [y, m] = key.split("-");
   return `${y}年${Number(m)}月`;

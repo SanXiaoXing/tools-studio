@@ -18,7 +18,7 @@ const COLLAPSE_KEY = "as-collapsed";
 /** 套餐存储额度（真实配额需后端返回，此处为前端默认值） */
 const STORAGE_TOTAL = 10 * 1024 * 1024 * 1024; // 10 GB
 
-export interface Sidebar {
+interface Sidebar {
   el: HTMLElement;
   navCount: HTMLElement;
   /** 用真实字节数刷新「已用空间」文案与进度条（套餐总额度为 STORAGE_TOTAL） */

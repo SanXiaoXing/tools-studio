@@ -2,7 +2,7 @@
  *  8px 轨道 + 主色填充 + 数值气泡 + 刻度（每 5 细线 / 每 10 数字标签）。
  *  键盘（←/→/Home/End）支持。onChange 拖动中触发，onCommit 松手/键盘提交触发。 */
 
-export interface ElasticSliderOptions {
+export interface SliderOptions {
   value: number;
   min: number;
   max: number;
@@ -16,7 +16,7 @@ const TICK_EVERY = 5; // 细刻度线间隔
 const LABEL_EVERY = 10; // 数字标签间隔
 const STEP = 5; // 拖动/键盘步进（与细刻度对齐）
 
-export function renderElasticSlider(container: HTMLElement, opts: ElasticSliderOptions) {
+export function renderElasticSlider(container: HTMLElement, opts: SliderOptions) {
   const { min, max } = opts;
   let value = Math.min(Math.max(opts.value, min), max);
 

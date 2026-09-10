@@ -5,7 +5,7 @@ import type { ImageItem } from "./types";
  *
  * 启动时先读缓存立即渲染（秒开、离线可用），后台再与云端同步并覆盖缓存。
  * 只缓存业务数据：objectURL 是会话级 blob 引用（DESIGN-SPEC §8.4），
- * 序列化前必须剥离，加载后预览回退到公开 URL（utils.ts imgSrc）。
+ * 序列化前必须剥离，加载后预览回退到公开 URL。
  */
 const CACHE_KEY = "as-cache";
 const CACHE_VERSION = 1;

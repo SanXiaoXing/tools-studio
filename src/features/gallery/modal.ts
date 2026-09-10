@@ -5,7 +5,7 @@ import { icon } from "../../lib/icons";
 import { getSettings, updateSettings } from "../../lib/settings";
 import { renderSlidingSeg } from "../../lib/seg";
 
-export interface ModalCallbacks {
+interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
   onConfirmDelete: (it: ImageItem) => void;
 }
@@ -16,7 +16,7 @@ interface ThumbRes {
   path: string;
 }
 
-export interface DetailModal {
+interface DetailModal {
   open(it: ImageItem): void;
   close(): void;
 }

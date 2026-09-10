@@ -38,12 +38,12 @@ function animateSpring(
   return () => cancelAnimationFrame(raf);
 }
 
-export interface SegOption<T extends string> {
+interface SegOption<T extends string> {
   value: T;
   label: string;
 }
 
-export interface SlidingSeg<T extends string> {
+interface SlidingSeg<T extends string> {
   /**
    * 设置当前选中值：同步滑动指示器 + 文字高亮，并触发 onChange（用户点击 / 外部同步共用）。
    * `silent: true` 仅同步指示器与高亮、不触发 onChange（用于恢复默认 / 导入备份等外部同步，
