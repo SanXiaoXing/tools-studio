@@ -210,7 +210,7 @@ const modal = createModal({
 function render(): void {
   const items = getItems();
   renderGallery(galleryBody, items, {
-    onDetail: (it) => modal.open(it),
+    onDetail: (it, card) => modal.open(it, card),
     onEmptyUpload: () => tabbar.open("upload"),
   });
   navCount.textContent = String(items.length);

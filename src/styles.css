@@ -276,6 +276,24 @@
   animation: shimmer 1.2s infinite linear;
 }
 
+/* 图库卡片入场（gallery.ts）：展开月份节点、哨兵追加下一批时，新出现的卡片
+   带 gs-enter + animation-delay（按序号错开，上限 STAGGER_MAX 档）逐张淡入上浮。
+   只动 transform / opacity。
+   fill-mode 必须是 backwards：延迟期间先吃 from 帧（不可见），动画结束后交回正常态；
+   若用 forwards，动画最终帧会一直压住卡片 hover 的 -translate-y-0.5。 */
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+.gs-enter {
+  animation: card-enter 240ms cubic-bezier(0.32, 0.72, 0.24, 1) backwards;
+}
+/* 减少动效：全局已把 animation-duration 压到 0.01ms，这里再清掉错开延迟，
+   否则卡片会先隐形最长 200ms 再瞬间出现 */
+@media (prefers-reduced-motion: reduce) {
+  .gs-enter { animation-delay: 0ms !important; }
+}
+
 /* 全局拖拽遮罩（main.ts）：强高斯毛玻璃 + 品牌色径向光晕 + 虚线拖放框
    注意：背景必须半透明，backdrop-filter 才能模糊到背后的内容；
    浅色主题下 --color-accent-soft 为不透明色，会遮住中心模糊，
@@ -316,15 +334,64 @@
   50%      { transform: scale(1.07); }
 }
 
+/* Shared Element Transition（Card → 详情弹窗）：三层飞行元素，只动 transform / opacity / clip-path。
+   - shell 壳：承载"卡片矩形 → 弹窗矩形"的非等比变形。壳内没有位图，只有纯色面 + 描边，
+     所以非等比不会拉伸任何像素。栅格化按终点尺寸，飞行中只做缩小方向的缩放，
+     避免 WKWebView 放大首帧按错尺寸重栅格化（旧实现的图片卡顿来源）。
+   - shadow 阴影：单独一层只动 opacity，交接时与真实弹窗阴影同强度，避免阴影"啪"地出现。
+   - view 图片层：等比放大到刚好 cover 窗口、用 clip-path 裁掉窗口外部分，
+     因此全程不变形；起点与卡片 object-cover、终点与弹窗 object-contain 像素级重合。 */
+.shared-el-shell {
+  position: fixed;
+  z-index: 44;
+  margin: 0;
+  pointer-events: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 16px; /* 与弹窗 rounded-2xl 一致；起点与卡片 12px 的差异由卡片自身像素补齐 */
+  box-sizing: border-box;
+  transform-origin: top left;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.shared-el-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  box-shadow: var(--shadow-modal);
+  opacity: 0;
+  pointer-events: none;
+}
+.shared-el-view {
+  position: fixed;
+  z-index: 45;
+  margin: 0;
+  pointer-events: none;
+  object-fit: cover;
+  transform-origin: top left;
+  user-select: none;
+  -webkit-user-drag: none;
+  will-change: transform, clip-path;
+  backface-visibility: hidden;
+}
+.modal-dialog {
+  transform-origin: top left;
+}
+/* 转场期：飞行层已完全盖住弹窗，屏蔽弹窗内部命中，避免交接瞬间误点按钮。
+   遮罩的 backdrop-blur 全程保留（不再中途开关），否则结束时模糊"啪"地出现又是一次闪。 */
+.modal-root.is-shared-anim .modal-dialog {
+  pointer-events: none;
+}
+
 /* 详情弹窗进出场（DESIGN-SPEC §5：只动 transform/opacity）：
-   背景淡入淡出；面板轻微缩放+上浮，Apple 式克制感。 */
-.modal-anim-in {
+   无共享元素 source 时的回退；背景由独立遮罩层淡入淡出，面板轻微缩放+上浮，Apple 式克制感。 */
+.modal-anim-in .modal-backdrop {
   animation: modal-bg-in 200ms ease-out;
 }
 .modal-anim-in > [role="dialog"] {
   animation: modal-panel-in 200ms cubic-bezier(0.32, 0.72, 0.24, 1);
 }
-.modal-anim-out {
+.modal-anim-out .modal-backdrop {
   animation: modal-bg-out 160ms ease-in forwards;
 }
 .modal-anim-out > [role="dialog"] {

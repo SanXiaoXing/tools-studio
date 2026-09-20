@@ -6,7 +6,8 @@ import { copyLink, removeItem } from "../../lib/store";
 import { groupByPeriod, type PeriodGroup } from "./periods";
 
 interface GalleryCallbacks {
-  onDetail: (it: ImageItem) => void;
+  /** card：触发详情的卡片元素，供详情弹窗做 Shared Element Transition */
+  onDetail: (it: ImageItem, card: HTMLElement) => void;
   onEmptyUpload: () => void;
 }
 
@@ -23,6 +24,10 @@ interface GalleryCallbacks {
 /** 每个展开节点的首批 / 每批追加渲染卡片数 */
 const CHUNK = 60;
 
+/** 卡片入场：逐张错开步长 / 最大错开张数（超出部分共用最后一档，避免长列表拖太久） */
+const STAGGER_MS = 18;
+const STAGGER_MAX = 12;
+
 const TL_CLS = "gallery-tl h-full overflow-y-auto p-5 pl-9 pr-9 pb-12";
 const GRID_CLS = "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 content-start pt-3";
 
@@ -33,6 +38,14 @@ const manualExpanded = new Set<string>();
 const manualCollapsed = new Set<string>();
 /** 各节点已渲染的卡片数（哨兵分批追加进度） */
 const visibleMap = new Map<string, number>();
+/**
+ * 本次渲染需要做入场动画的节点：value = 从该节点第几张卡片开始动画。
+ * 只由「用户展开节点」「哨兵追加下一批」写入，渲染时消费一次即清空 ——
+ * store 变更 / 删除之类的重绘不会让已上屏的卡片重新动一遍。
+ */
+const enterFrom = new Map<string, number>();
+/** 首屏是否已经做过入场：每次启动只做一次，切页签 / store 重绘不再重放 */
+let paintedOnce = false;
 let observer: IntersectionObserver | null = null;
 // 最近一次渲染的上下文，节点展开/折叠、哨兵追加时复用，无需经 store 重绘
 let ctx: { container: HTMLElement; items: ImageItem[]; cb: GalleryCallbacks } | null = null;
@@ -50,6 +63,7 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
     manualExpanded.clear();
     manualCollapsed.clear();
     visibleMap.clear();
+    enterFrom.clear();
     observer?.disconnect();
     renderEmpty(container, cb);
     return;
@@ -58,6 +72,11 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
   const groups = groupByPeriod(items);
   latestKey = groups[0]?.key ?? "";
   currentGroupsByKey = new Map(groups.map((g) => [g.key, g.items]));
+  // 首屏：最新月默认展开，让它也走一次入场，不要一打开就"啪"地铺满
+  if (!paintedOnce && latestKey) {
+    paintedOnce = true;
+    enterFrom.set(latestKey, 0);
+  }
 
   // 重绘前记录滚动位置（展开/折叠、哨兵追加、store 变更共用同一渲染入口）
   const prevScroll = container.querySelector<HTMLElement>(".gallery-tl")?.scrollTop ?? 0;
@@ -66,6 +85,7 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
   <div class="${TL_CLS}">
     ${groups.map((g, gi) => sectionHTML(g, gi === groups.length - 1)).join("")}
   </div>`;
+  enterFrom.clear(); // 入场计划已被 sectionHTML 消费，避免下次重绘重复动画
 
   const tl = container.querySelector<HTMLElement>(".gallery-tl")!;
   tl.scrollTop = prevScroll;
@@ -86,7 +106,9 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
         const hit = entries.find((en) => en.isIntersecting);
         if (!hit) return;
         const key = (hit.target as HTMLElement).dataset.key ?? "";
-        visibleMap.set(key, (visibleMap.get(key) ?? CHUNK) + CHUNK);
+        const prev = visibleMap.get(key) ?? CHUNK;
+        visibleMap.set(key, prev + CHUNK);
+        enterFrom.set(key, prev); // 追加批次：只给新出现的那批卡片做入场
         if (ctx) renderGallery(ctx.container, ctx.items, ctx.cb);
       },
       { root: tl, rootMargin: "600px" },
@@ -102,6 +124,8 @@ export function renderGallery(container: HTMLElement, items: ImageItem[], cb: Ga
 function sectionHTML(g: PeriodGroup, isLast: boolean): string {
   const expanded = isExpanded(g.key);
   const vis = Math.min(visibleMap.get(g.key) ?? CHUNK, g.items.length);
+  // 本次新增卡片的起点（展开 = 0，追加 = 上一批末尾）；未登记则整节点不做入场
+  const from = enterFrom.get(g.key);
   return `
   <section class="tl-sec relative pl-7 pb-2" data-key="${g.key}">
     ${isLast ? "" : '<span class="absolute left-[5px] top-6 bottom-0 w-px bg-line" aria-hidden="true"></span>'}
@@ -118,7 +142,7 @@ function sectionHTML(g: PeriodGroup, isLast: boolean): string {
         ? `<div class="${GRID_CLS}">
             ${g.items
               .slice(0, vis)
-              .map((it, i) => cardHTML(it, i))
+              .map((it, i) => cardHTML(it, i, from !== undefined && i >= from ? i - from : -1))
               .join("")}
             ${g.items.length > vis ? `<div class="gallery-sentinel col-span-full flex items-center justify-center py-2 text-xs text-ink3" data-key="${g.key}">加载更多…</div>` : ""}
           </div>`
@@ -138,6 +162,7 @@ function onTimelineClick(e: MouseEvent, cb: GalleryCallbacks): void {
     } else {
       manualExpanded.add(key);
       manualCollapsed.delete(key);
+      enterFrom.set(key, 0); // 展开：该节点整批卡片依次入场
     }
     if (ctx) renderGallery(ctx.container, ctx.items, ctx.cb);
     return;
@@ -184,10 +209,16 @@ function hydrateThumbs(tl: HTMLElement): void {
   });
 }
 
-function cardHTML(it: ImageItem, i: number): string {
+/**
+ * 单张卡片。step >= 0 表示这张卡是本次新增的（step 为它在新增批次里的序号），
+ * 加 gs-enter 按序号错开入场；step < 0 直接以最终状态上屏，不做动画。
+ */
+function cardHTML(it: ImageItem, i: number, step = -1): string {
+  const enter = step < 0 ? "" : " gs-enter";
+  const delay = step < 0 ? "" : ` style="animation-delay:${Math.min(step, STAGGER_MAX) * STAGGER_MS}ms"`;
   return `
-  <article class="card group bg-surface border border-line rounded-xl p-2.5 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200 ease" data-i="${i}">
-    <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-surface2 cursor-zoom-in">
+  <article class="card group bg-surface border border-line rounded-xl p-2.5 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-[transform,box-shadow] duration-200 ease${enter}"${delay} data-i="${i}">
+    <div class="card-media relative aspect-[4/3] rounded-lg overflow-hidden bg-surface2 cursor-zoom-in">
       ${
         it.objectURL
           ? `<img src="${esc(it.objectURL)}" alt="${esc(it.name)}" loading="lazy" decoding="async" class="w-full h-full object-cover">`
@@ -235,7 +266,7 @@ function onCardClick(e: MouseEvent, cb: GalleryCallbacks): void {
     const actions = card.querySelector<HTMLElement>(".ov-actions");
     const confirm = card.querySelector<HTMLElement>(".ov-confirm");
     if (act === "copy") void copyLink(it, btn);
-    if (act === "detail") cb.onDetail(it);
+    if (act === "detail") cb.onDetail(it, card);
     if (act === "delete" && actions && confirm) {
       actions.hidden = true;
       confirm.hidden = false;
@@ -248,7 +279,7 @@ function onCardClick(e: MouseEvent, cb: GalleryCallbacks): void {
   const t = e.target as HTMLElement;
   if (t.closest(".overlay") || t.closest("img")) {
     cancelConfirm(card); // 若正处于删除确认态，先复位再打开详情
-    cb.onDetail(it);
+    cb.onDetail(it, card);
   }
 }
 
