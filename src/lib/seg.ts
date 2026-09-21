@@ -144,6 +144,7 @@ export function renderSlidingSeg<T extends string>(
   let metricsValid = false;
   let pendingIndex = -1; // 容器不可见（尺寸为 0）时暂存目标项
   let progress = 0; // 当前插值进度（0..n-1）
+  let targetIndex = 0; // 最近一次 setValue 的目标项，供尺寸变化后续接动画
 
   const measure = (): boolean => {
     const m = btns.map((b) => ({ x: b.offsetLeft, w: b.offsetWidth }));
@@ -168,7 +169,9 @@ export function renderSlidingSeg<T extends string>(
   };
 
   const placeAuto = (i: number, animate: boolean): void => {
+    targetIndex = i;
     cancelSpring?.();
+    cancelSpring = null;
     if (!animate) {
       progress = i;
       applyProgress(i);
@@ -243,7 +246,7 @@ export function renderSlidingSeg<T extends string>(
         inited = true;
         return;
       }
-      placeAuto(progress, false); // 尺寸变化后按当前进度重排，不做动画
+      placeAuto(targetIndex, cancelSpring !== null);
     });
     ro.observe(wrapEl);
     btns.forEach((b) => ro.observe(b));
