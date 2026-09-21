@@ -1,12 +1,11 @@
 import { renderSidebar } from "./app/sidebar";
-import { createTabBar, type TabDef } from "./app/tabbar";
 import { renderGallery } from "./features/gallery/gallery";
 import { createModal } from "./features/gallery/modal";
 import { renderUploadView, type UploadApi } from "./features/upload/upload";
 import { renderSettingsView } from "./features/settings/settingsView";
 import { renderDeployView } from "./features/deploy/deployView";
 import type { ImageItem, ObjectItem, ObjectList, ViewName } from "./lib/types";
-import { basename, errorMessage, formatBytes, pad2, showToast } from "./lib/utils";
+import { basename, errorMessage, formatBytes, formatDateTime, showToast } from "./lib/utils";
 import { icon } from "./lib/icons";
 import { getSettings } from "./lib/settings";
 import { applyTheme } from "./lib/theme";
@@ -37,53 +36,47 @@ const headerHTML = (title: string, sub: string): string => `
   </header>`;
 
 const VIEW_BASE = "flex-1 min-h-0 flex flex-col overflow-hidden";
+const BODY_COL = "flex-1 min-h-0 flex flex-col";
+const BODY_FILL = "flex-1 min-h-0";
 
-const galleryView = document.createElement("div");
-galleryView.className = VIEW_BASE;
-galleryView.innerHTML = headerHTML("图片库", '<span id="gallerySub">共 10 张图片，点击图片查看详情</span>');
-const galleryBody = document.createElement("div");
-galleryBody.className = "flex-1 min-h-0";
-galleryView.appendChild(galleryBody);
-
-const uploadView = document.createElement("div");
-uploadView.className = VIEW_BASE;
-uploadView.innerHTML = headerHTML("上传图片", "拖拽或选择图片，自动压缩并上传，完成后一键复制链接");
-const uploadBody = document.createElement("div");
-uploadBody.className = "flex-1 min-h-0 flex flex-col";
-uploadView.appendChild(uploadBody);
-
-const settingsView = document.createElement("div");
-settingsView.className = VIEW_BASE;
-settingsView.innerHTML = headerHTML("设置", "链接域名、存储路径与文件名重命名规则");
-const settingsBody = document.createElement("div");
-settingsBody.className = "flex-1 min-h-0 flex flex-col";
-settingsView.appendChild(settingsBody);
-
-const deployView = document.createElement("div");
-deployView.className = VIEW_BASE;
-deployView.innerHTML = headerHTML("部署 Worker", "复制源码与配置，部署你自己的 Cloudflare Worker");
-const deployBody = document.createElement("div");
-deployBody.className = "flex-1 min-h-0 flex flex-col";
-deployView.appendChild(deployBody);
-
-const views: Record<ViewName, HTMLElement> = {
-  gallery: galleryView,
-  upload: uploadView,
-  settings: settingsView,
-  deploy: deployView,
+/** 视图壳：页头 + 内容体，四个内置视图共用 */
+const createView = (
+  title: string,
+  sub: string,
+  bodyCls: string,
+): { root: HTMLElement; body: HTMLElement } => {
+  const root = document.createElement("div");
+  root.className = VIEW_BASE;
+  root.innerHTML = headerHTML(title, sub);
+  const body = document.createElement("div");
+  body.className = bodyCls;
+  root.appendChild(body);
+  return { root, body };
 };
 
-/** 标签页定义（docs/design/sidebar.md 框架）：四个内置视图各对应一个可开关的标签页 */
-const TAB_DEFS: TabDef[] = [
-  { id: "gallery", label: "浏览图片", icon: icon.image },
-  { id: "upload", label: "上传图片", icon: icon.upload },
-  { id: "settings", label: "设置", icon: icon.sliders },
-  { id: "deploy", label: "部署 Worker", icon: icon.code },
-];
+const gallery = createView(
+  "图片库",
+  '<span id="gallerySub">共 10 张图片，点击图片查看详情</span>',
+  BODY_FILL,
+);
+const upload = createView(
+  "上传图片",
+  "拖拽或选择文件；可仅压缩到本地文件夹（图片→WebP，视频→WebM），或压缩后上传",
+  BODY_COL,
+);
+const settings = createView("设置", "链接域名、存储路径与文件名重命名规则", BODY_COL);
+const deploy = createView("部署 Worker", "复制源码与配置，部署你自己的 Cloudflare Worker", BODY_COL);
 
-const { el: sidebarEl, navCount, setStorage } = renderSidebar((v) => tabbar.open(v));
+const views: Record<ViewName, HTMLElement> = {
+  gallery: gallery.root,
+  upload: upload.root,
+  settings: settings.root,
+  deploy: deploy.root,
+};
 
-/** 展示视图：隐藏非当前视图，同步导航激活态（激活态由标签条驱动） */
+const { el: sidebarEl, navCount, setStorage } = renderSidebar((v) => showView(v));
+
+/** 展示视图：隐藏非当前视图，同步侧边栏导航激活态 */
 function showView(v: ViewName): void {
   for (const name of Object.keys(views) as ViewName[]) views[name].hidden = name !== v;
   sidebarEl.querySelectorAll<HTMLElement>("[data-view]").forEach((n) => {
@@ -98,25 +91,21 @@ function showView(v: ViewName): void {
   });
 }
 
-// 标签条：状态持久化恢复（打开顺序 + 激活视图），首帧 onChange 完成初始视图切换
-const tabbar = createTabBar(TAB_DEFS, showView);
-
-// 应用外壳（sidebar.md 框架）：侧边栏 + 内容列（chrome 色底）＝ 标签条 + 内容面板。
-// tab-strip 与 sheet 直接拼接，指示条向下延伸覆盖 sheet 左上圆角，形成统一容器轮廓。
+// 应用外壳：侧边栏 + 内容面板（chrome 色底上的 sheet）
 const content = document.createElement("main");
 content.className = "flex-1 min-w-0 flex flex-col overflow-hidden bg-surface2";
-content.appendChild(tabbar.el);
 const sheet = document.createElement("section");
-sheet.className = "relative flex-1 min-h-0 px-3 pb-3 pt-0 overflow-hidden";
+sheet.className = "relative flex-1 min-h-0 p-3 overflow-hidden";
 content.appendChild(sheet);
 const sheetInner = document.createElement("div");
-sheetInner.className = "relative h-full rounded-b-xl bg-canvas shadow-card overflow-hidden flex flex-col border border-line border-t-0";
+sheetInner.className =
+  "relative h-full rounded-xl bg-canvas shadow-card overflow-hidden flex flex-col border border-line";
 sheet.appendChild(sheetInner);
 app.appendChild(sidebarEl);
 app.appendChild(content);
 for (const v of Object.keys(views) as ViewName[]) sheetInner.appendChild(views[v]);
 
-const gallerySub = document.querySelector<HTMLElement>("#gallerySub")!;
+const gallerySub = gallery.root.querySelector<HTMLElement>("#gallerySub")!;
 
 /** 图库页头右侧「刷新云端列表」按钮：云端同步仅在启动（缓存过期/为空）触发，
  *  上传/删除之外缺少手动恢复入口（曾导致打包版长期停留在残缺列表），这里补齐。 */
@@ -127,13 +116,12 @@ refreshBtn.setAttribute("aria-label", refreshBtn.title);
 refreshBtn.className =
   "ml-auto self-center flex items-center justify-center w-8 h-8 rounded-[10px] text-ink2 hover:bg-surface3 hover:text-ink transition shrink-0";
 refreshBtn.innerHTML = icon.refresh;
-galleryView.querySelector("header")!.appendChild(refreshBtn);
+gallery.root.querySelector("header")!.appendChild(refreshBtn);
 
 /** ISO 时间 → "YYYY-MM-DD HH:mm"（本地时区），与上传列表日期格式一致 */
 function formatCloudDate(iso: string): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d);
 }
 
 /** 云端对象 → 图片库项：名称取 key 末段，尺寸/时间来自 Worker 返回（无本地文件元数据） */
@@ -150,19 +138,9 @@ function cloudItemToImageItem(o: ObjectItem): ImageItem {
   };
 }
 
-/** 图片扩展名白名单（与 Worker 的 ALLOWED_TYPES 一致），用于过滤云端列表 */
-const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif"]);
-
-/** 仅图片对象：key 以图片扩展名结尾，排除目录占位（/ 结尾）等非图片对象 */
-function isImageObject(o: ObjectItem): boolean {
-  if (o.key.endsWith("/")) return false;
-  const ext = o.key.slice(o.key.lastIndexOf(".") + 1).toLowerCase();
-  return IMAGE_EXTS.has(ext);
-}
-
 /** 从云端拉取完整图片列表并写入 store（API.md §4：GET /objects 分页合并）。
  *  启动同步与页头手动刷新共用；失败时保留本地现有数据（store 已从缓存恢复），
- *  通过 toast 提示并恢复原列表，便于用户重试。 */
+ *  通过 toast 提示并恢复原列表，便于用户重试。图片过滤由 Worker 负责。 */
 let syncing = false;
 async function syncCloudGallery(): Promise<void> {
   if (syncing) return;
@@ -180,8 +158,7 @@ async function syncCloudGallery(): Promise<void> {
         limit: 1000,
         cursor: cursor ?? null,
       });
-      // 过滤非图片对象（目录占位 / 非图片扩展名），兼容旧版未过滤的 Worker
-      all.push(...page.items.filter(isImageObject));
+      all.push(...page.items);
       cursor = page.has_more ? page.cursor : null;
     } while (cursor);
     // R2 列表按 key 升序（即时间正序）；倒序让最新图片排最前，与上传流程一致
@@ -209,9 +186,9 @@ const modal = createModal({
 /** 重绘：状态来自 store（订阅触发），侧边栏已用空间用云端真实统计或本地累加兜底 */
 function render(): void {
   const items = getItems();
-  renderGallery(galleryBody, items, {
+  renderGallery(gallery.body, items, {
     onDetail: (it, card) => modal.open(it, card),
-    onEmptyUpload: () => tabbar.open("upload"),
+    onEmptyUpload: () => showView("upload"),
   });
   navCount.textContent = String(items.length);
   gallerySub.textContent =
@@ -219,20 +196,20 @@ function render(): void {
   setStorage(getUsedBytes());
 }
 
-const uploadApi: UploadApi = renderUploadView(uploadBody);
+const uploadApi: UploadApi = renderUploadView(upload.body);
 // 存储用量：设置页手动刷新（WORKER-V2.md §8）时直接写入 store，订阅触发侧边栏同步；
 // 「部署 Worker」入口：跳转到部署页面（侧边栏已移除该导航）
-renderSettingsView(settingsBody, {
-  onOpenDeploy: () => tabbar.open("deploy"),
+renderSettingsView(settings.body, {
+  onOpenDeploy: () => showView("deploy"),
 });
 
 // 部署 Worker 视图：展示源码/配置 + 复制按钮，用户自行部署（不替用户创建远端资源）；
 // 「返回设置」按钮回到设置页（从设置页入口进入，侧边栏无独立导航）
-renderDeployView(deployBody, {
-  onBack: () => tabbar.open("settings"),
+renderDeployView(deploy.body, {
+  onBack: () => showView("settings"),
 });
 
-// ---- 全局拖拽遮罩（vanilla 内联）：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
+// ---- 全局拖拽遮罩：拖入窗口时全屏提示，drop 后跳转上传页并触发二次确认 ----
 const dragMask = document.createElement("div");
 dragMask.className = "drag-overlay fixed inset-0 z-50 pointer-events-none";
 dragMask.setAttribute("role", "status");
@@ -244,7 +221,7 @@ dragMask.innerHTML = `
       <div class="drag-overlay-icon flex items-center justify-center text-accent">${icon.upload}</div>
       <div class="text-center">
         <p class="text-lg font-bold text-white">释放文件以上传图片</p>
-        <p class="mt-1 text-sm text-white/70">自动转换为 WebP 并压缩</p>
+        <p class="mt-1 text-sm text-white/70">图片→WebP，视频→WebM；可仅压缩或压缩后上传</p>
       </div>
     </div>
   </div>`;
@@ -259,7 +236,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
   if (t === "leave") setDragVisible(false);
   if (t === "drop") {
     setDragVisible(false);
-    tabbar.open("upload");
+    showView("upload");
     uploadApi.requestUpload(event.payload.paths);
   }
 });
@@ -270,6 +247,7 @@ void getCurrentWebview().onDragDropEvent((event) => {
 // 而不是停留在空列表直到 7 天缓存过期（上传/删除会写回并续期缓存）。
 subscribe(render);
 render();
+showView("gallery");
 if (isCloudSyncNeeded() || getItems().length === 0) {
   void refreshCloudUsage();
   void syncCloudGallery();

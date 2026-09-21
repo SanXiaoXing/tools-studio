@@ -1,9 +1,9 @@
 import type { ImageItem } from "../../lib/types";
-import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { formatContent } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { getSettings, updateSettings } from "../../lib/settings";
 import { renderSlidingSeg } from "../../lib/seg";
+import { fetchThumbnails, thumbSrc } from "../../lib/thumbs";
 import {
   finishTransitionFx,
   getRect,
@@ -17,12 +17,6 @@ import {
 interface ModalCallbacks {
   onCopy: (it: ImageItem, btn: HTMLButtonElement) => void;
   onConfirmDelete: (it: ImageItem) => void;
-}
-
-/** get_thumbnails 命令经 Channel 回传的单条结果：path 为本地缩略图路径，空串表示生成失败 */
-interface ThumbRes {
-  key: string;
-  path: string;
 }
 
 interface DetailModal {
@@ -135,15 +129,16 @@ export function createModal(cb: ModalCallbacks): DetailModal {
     const seq = ++previewSeq;
     const key = it.path;
     const fallback = it.url ?? "";
-    invoke("get_thumbnails", {
-      items: [{ key, url: fallback }],
-      onMessage: new Channel<ThumbRes>((res) => {
+    fetchThumbnails(
+      [{ key, url: fallback }],
+      (res) => {
         if (seq !== previewSeq || res.key !== key) return;
-        applyPreview(res.path ? convertFileSrc(res.path) : fallback);
-      }),
-    }).catch(() => {
-      if (seq === previewSeq) applyPreview(fallback);
-    });
+        applyPreview(res.path ? thumbSrc(res.path) : fallback);
+      },
+      () => {
+        if (seq === previewSeq) applyPreview(fallback);
+      },
+    );
   };
 
   const resetDelete = (): void => {

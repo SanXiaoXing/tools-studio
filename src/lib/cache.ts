@@ -11,7 +11,7 @@ const CACHE_KEY = "as-cache";
 const CACHE_VERSION = 1;
 
 /** 缓存有效期：超过该时长未更新（无上传/删除/云端同步），启动时重新拉取云端，平衡秒开与数据新鲜度 */
-export const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
+const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 天
 
 export interface GalleryCache {
   v: number;

@@ -8,8 +8,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init());
+        .plugin(tauri_plugin_dialog::init());
 
     // 窗口状态记忆（v2.tauri.app/plugin/window-state）：必须在窗口创建前注册到 Builder，
     // 插件才能在 on_window_ready 中恢复位置/大小/最大化。若注册在 setup 内，主窗口已创建
@@ -40,12 +39,15 @@ pub fn run() {
             commands::get_config,
             commands::set_config,
             commands::convert_to_webp,
+            commands::compress_video_to_webm,
             commands::upload_image,
             commands::sync_usage,
             commands::delete_image,
             commands::list_images,
             commands::get_thumbnails,
             commands::delete_thumbnail,
+            commands::open_folder,
+            commands::open_url,
             commands::export_settings,
             commands::import_settings
         ])

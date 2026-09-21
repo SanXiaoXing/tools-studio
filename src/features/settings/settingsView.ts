@@ -6,18 +6,17 @@ import { fillTemplate } from "../../lib/naming";
 import { icon } from "../../lib/icons";
 import { copyText, errorMessage, feedbackCheck, generateApiKey, showToast } from "../../lib/utils";
 import { setCloudUsage } from "../../lib/store";
+import {
+  CODE_CLS,
+  GHOST_BTN_CLS,
+  HINT_CLS,
+  INPUT_CLS,
+  PRIMARY_BTN_CLS,
+  SCROLL_BODY_CLS,
+} from "../../lib/ui-classes";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { renderElasticSlider } from "./elasticSlider";
-
-const INPUT_CLS =
-  "w-full px-3 py-2.5 rounded-lg border border-line bg-surface2 text-ink text-[13px] outline-none focus:border-accent transition-colors";
-const HINT_CLS = "text-xs text-ink3 mt-1.5 leading-relaxed";
-const CODE_CLS = "font-mono text-[11px] bg-surface3 border border-line rounded px-1.5 py-0.5 text-ink2";
-const GHOST_BTN_CLS =
-  "inline-flex items-center rounded-lg px-3 py-1.5 border border-line bg-surface text-ink2 text-xs font-medium hover:bg-surface3 hover:text-ink transition";
-const PRIMARY_BTN_CLS =
-  "inline-flex items-center rounded-lg px-4 py-1.5 bg-accent-strong text-white text-[13px] font-semibold hover:bg-accent active:scale-[.985] transition";
 
 /** API Key 只读态打码：8 个圆点 + 尾号 4 位（DESIGN-SPEC §3.4） */
 const maskKey = (v: string): string => (v ? "•".repeat(8) + v.slice(-4) : "未设置");
@@ -98,7 +97,7 @@ export function renderSettingsView(
 ): void {
   const cur = getSettings();
   container.innerHTML = `
-  <div class="settings-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
+  <div class="${SCROLL_BODY_CLS}">
     <div class="flex flex-col gap-4">
 
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">

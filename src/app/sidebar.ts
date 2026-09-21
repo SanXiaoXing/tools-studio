@@ -2,7 +2,7 @@ import appIcon from "../assets/app-icon.png";
 import { icon } from "../lib/icons";
 import type { ViewName } from "../lib/types";
 import { formatBytes } from "../lib/utils";
-import { open } from "@tauri-apps/plugin-shell";
+import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 
 const GITHUB_URL = "https://github.com/SanXiaoXing/tools-studio";
@@ -119,7 +119,7 @@ export function renderSidebar(onNavigate: (v: ViewName) => void): Sidebar {
     }
     const gh = (e.target as HTMLElement).closest(".github-link");
     if (gh) {
-      void open(GITHUB_URL);
+      void invoke("open_url", { url: GITHUB_URL });
       return;
     }
     const cb = (e.target as HTMLElement).closest(".collapse-btn");

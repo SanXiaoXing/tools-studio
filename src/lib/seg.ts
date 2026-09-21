@@ -38,6 +38,32 @@ function animateSpring(
   return () => cancelAnimationFrame(raf);
 }
 
+/**
+ * 分段指示器统一的 spring 参数，四处分段控件（主题 / 命名方式 / 链接格式 / 压缩模式）共用，
+ * 保证滑动手感完全一致：
+ * - damping 0.75（略欠阻尼）：滑到位后带回弹落位，比临界阻尼"重"，即所说的阻尼感；
+ * - response 0.36s：比默认 0.3s 慢一档，短距离位移也看得清过程，不会一闪而过。
+ * 默认值 1.0 / 0.3 是临界阻尼，本身无过冲，短距滑动基本看不出动画，故此处统一放宽。
+ * 实测（60Hz 半隐式欧拉）：约 0.12s 走完 85%，末端过冲 0.5%~0.6%（≈0.5px），0.55s 静止。
+ * 过冲量刻意压得很小：指示器只有轨道内边距（SEG_PAD）可容身，过冲再大就会冲出轨道边框。
+ */
+const SEG_SPRING = { damping: 0.75, response: 0.36 };
+
+/** 弹簧过冲时允许越界的项数上限。仅作保护，实际过冲不到 1% 项，远小于此值 */
+const SEG_OVERRUN = 0.08;
+
+/** 轨道内边距（px）。下面三处必须与它同步，否则指示器会跟按钮错位：
+ *  ① 轨道 wrapper 的 p-1 ② 指示器的 top/bottom/left-1 ③ 等分宽度 calc((100% - 2*SEG_PAD)/n)。
+ *  指示器内圆角也由它决定（轨道外圆角 - SEG_PAD），见 wrapCls 处的同心圆角注释。
+ *  取值比原来的 2px 大，让轨道留出呼吸感、指示器与文字之间不再贴死。 */
+const SEG_PAD = 4;
+
+/** 分段控件统一的蓝色指示器与选中文字色（styles.css 的 .seg-thumb-blue / --color-seg-thumb）。
+ *  主题切换、命名方式、链接格式、压缩模式四处共用同一套默认样式，
+ *  颜色与滑动动画都不在调用处单独覆盖，避免又出现"一处蓝一处白"。 */
+const SEG_THUMB_CLASS = "seg-thumb-blue";
+const SEG_ACTIVE_CLASS = "text-accent font-semibold";
+
 interface SegOption<T extends string> {
   value: T;
   label: string;
@@ -58,7 +84,8 @@ interface SlidingSeg<T extends string> {
  * 首次渲染直接落位不做入场动画；prefers-reduced-motion 时直接切换。
  * size: "md"（默认，主题）| "sm"（紧凑，如命名方式）。
  * autoWidth: 每项按文字长短自适应（滑块宽度/位置随选中项实际尺寸变化），
- *   默认 false —— 等分宽度（旧行为，用于主题 / 命名方式）。
+ *   默认 false —— 等分宽度（用于主题 / 命名方式）。
+ * 指示器与选中文字外观统一用 SEG_THUMB_CLASS / SEG_ACTIVE_CLASS，调用处不传参。
  */
 export function renderSlidingSeg<T extends string>(
   container: HTMLElement,
@@ -73,21 +100,28 @@ export function renderSlidingSeg<T extends string>(
   const n = opts.options.length;
   const small = opts.size === "sm";
   const autoWidth = opts.autoWidth ?? false;
-  // autoWidth：宽度/位置由 JS 按实测尺寸写入（内联 left:0 覆盖 left-0.5，与 offsetLeft 同基准）
+  const thumbCls = SEG_THUMB_CLASS;
+  const activeCls = SEG_ACTIVE_CLASS;
+  // autoWidth：宽度/位置由 JS 按实测尺寸写入（内联 left:0 覆盖 left-1，与 offsetLeft 同基准）
   // 非 autoWidth：宽度等分，不能用 Tailwind 任意值 class（动态 ${n} 不会被扫描生成），用内联 style
-  const thumbStyle = autoWidth ? "left:0" : `width: calc((100% - 4px)/${n})`;
+  const thumbStyle = autoWidth ? "left:0" : `width: calc((100% - ${SEG_PAD * 2}px)/${n})`;
+  // 按钮内边距随轨道一起放大（原 sm 10/4px、md 12/6px 偏挤），保持字号与圆角不变
   const btnCls = small
-    ? "relative z-10 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-    : "relative z-10 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors";
+    ? "relative z-10 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
+    : "relative z-10 rounded-md px-3.5 py-2 text-[13px] font-medium transition-colors";
   // autoWidth：按钮按内容宽度排布（不 flex-1 均分），文字不换行
   const itemCls = autoWidth ? `${btnCls} flex-none whitespace-nowrap` : `${btnCls} flex-1`;
+  // 圆角必须同心：指示器内圆角 = 轨道外圆角 - SEG_PAD。轨道取 10px（与侧边栏导航项、
+  // 上传主按钮、弹窗关闭按钮同一档，app 的"选中态 chip"圆角），10 - 4 = 6px 即 rounded-md，
+  // 于是指示器与轨道的角平行、四周留白均匀；轨道若回到 8px，指示器就得降到 4px 才不顶角。
+  // 两点都写死成静态 class：动态拼 rounded-[${...}px] 同样扫不到，样式不会生成。
   // w-fit：宽度贴合内容（autoWidth 必选；sm 亦如此），不占满整行
   const wrapCls = autoWidth || small
-    ? "relative flex w-fit rounded-lg border border-line bg-surface2 p-0.5"
-    : "relative flex rounded-lg border border-line bg-surface2 p-0.5";
+    ? "relative flex w-fit rounded-[10px] border border-line bg-surface2 p-1"
+    : "relative flex rounded-[10px] border border-line bg-surface2 p-1";
   container.innerHTML = `
     <div class="${wrapCls}" role="group" aria-label="分段选择">
-      <div class="seg-thumb absolute top-0.5 bottom-0.5 left-0.5 rounded-md bg-surface shadow-sm will-change-transform" style="${thumbStyle}"></div>
+      <div class="seg-thumb absolute top-1 bottom-1 left-1 rounded-md will-change-transform ${thumbCls}" style="${thumbStyle}"></div>
       ${opts.options
         .map(
           (o) => `
@@ -119,10 +153,14 @@ export function renderSlidingSeg<T extends string>(
     return true;
   };
 
+  /** 位置 / 宽度插值。k 不夹到 [0,1]：弹簧过冲时线性外推，指示器越过目标再回弹落位
+   *  （等分模式下 translateX 天然过冲，这里补齐，两种模式手感才一致）。
+   *  t 的越界量由 SEG_OVERRUN 兜底，避免极端参数下指示器冲出容器。 */
   const applyProgress = (t: number): void => {
-    const a = Math.max(0, Math.min(Math.floor(t), n - 1));
+    const tc = Math.max(Math.min(t, n - 1 + SEG_OVERRUN), -SEG_OVERRUN);
+    const a = Math.max(0, Math.min(Math.floor(tc), n - 2));
     const b = Math.min(a + 1, n - 1);
-    const k = Math.max(0, Math.min(t - a, 1));
+    const k = tc - a;
     const x = metrics[a].x + (metrics[b].x - metrics[a].x) * k;
     const w = metrics[a].w + (metrics[b].w - metrics[a].w) * k;
     thumb.style.transform = `translateX(${x}px)`;
@@ -143,17 +181,18 @@ export function renderSlidingSeg<T extends string>(
         progress = v;
         applyProgress(v);
       },
-      { onComplete: () => { cancelSpring = null; } },
+      { ...SEG_SPRING, onComplete: () => { cancelSpring = null; } },
     );
   };
 
   const setValue = (v: T, extra?: { silent?: boolean }): void => {
     if (!extra?.silent) opts.onChange(v);
     const i = Math.max(0, btns.findIndex((b) => b.dataset.seg === v));
-    // 文字高亮立即切换（响应优先，不等动画）
+    // 文字高亮立即切换（响应优先，不等动画）；activeCls 可含多个 class
+    const activeTokens = activeCls.split(/\s+/).filter(Boolean);
     btns.forEach((b) => {
       const active = b.dataset.seg === v;
-      b.classList.toggle("text-ink", active);
+      activeTokens.forEach((c) => b.classList.toggle(c, active));
       b.classList.toggle("text-ink2", !active);
     });
 
@@ -185,7 +224,7 @@ export function renderSlidingSeg<T extends string>(
         thumbPos = v2;
         thumb.style.transform = `translateX(${v2 * 100}%)`;
       },
-      { onComplete: () => { cancelSpring = null; } },
+      { ...SEG_SPRING, onComplete: () => { cancelSpring = null; } },
     );
   };
 

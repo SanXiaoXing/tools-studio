@@ -4,8 +4,8 @@
  *
  * 双域名架构（API 与图片分离）：
  *   API 域名（Worker）：https://xxx.workers.dev
- *     负责 PUT / DELETE / HEAD /objects、GET /objects、GET /usage、POST /usage/rescan，
- *     所有请求必须带 X-API-Key 或 Authorization: Bearer。
+ *     负责 PUT / DELETE /objects、GET /objects、GET /usage、POST /usage/rescan，
+ *     所有请求必须带 X-API-Key。
  *   图片域名（R2 自定义域 / Public Bucket）
  *     图片读取由 R2 直接提供，不经过本 Worker，因此不需要 API Key。
  *     上传响应的 url = 「图片域名 + key」，别人可直接打开看图，但不能调用本 API。
@@ -87,12 +87,10 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    // 鉴权：接受 X-API-Key 或 Authorization: Bearer，恒定时间比较
+    // 鉴权：X-API-Key，恒定时间比较
     const expected = env.API_KEY ?? "";
     if (!expected) return error("INTERNAL", "Server misconfigured: API_KEY missing", 500, cors);
-    const provided =
-      request.headers.get("X-API-Key") ??
-      (request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? "");
+    const provided = request.headers.get("X-API-Key") ?? "";
     if (!(await timingSafeEqual(provided, expected))) {
       return error("UNAUTHORIZED", "API key is missing or invalid", 401, cors);
     }
@@ -125,7 +123,6 @@ export default {
       if (keyErr) return error(keyErr.code, keyErr.message, 400, cors);
       switch (request.method) {
         case "PUT": return putObject(request, env, key, cors);
-        case "HEAD": return headObject(env, key, cors);
         case "DELETE": return deleteObject(env, key, cors);
       }
       return error("METHOD_NOT_ALLOWED", "Method not allowed", 405, cors);
@@ -197,18 +194,6 @@ async function putObject(request, env, key, cors) {
     200,
     cors,
   );
-}
-
-/**
- * @param {Env} env
- * @param {string} key
- * @param {Headers} cors
- * @returns {Promise<Response>}
- */
-async function headObject(env, key, cors) {
-  const obj = await env.IMAGES.head(key);
-  if (!obj) return error("NOT_FOUND", "Object not found", 404, cors);
-  return new Response(null, { status: 200, headers: cors });
 }
 
 /**
@@ -442,31 +427,14 @@ async function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-/** 流式大小兜底：超过上限即报错，防止无 Content-Length 的大 body 绕过检查
- * @param {ReadableStream} stream
- * @param {number} max
- * @returns {ReadableStream} */
-function withLimit(stream, max) {
-  let total = 0;
-  return stream.pipeThrough(
-    new TransformStream({
-      transform(chunk, controller) {
-        total += chunk.byteLength;
-        if (total > max) controller.error(new Error("TOO_LARGE"));
-        else controller.enqueue(chunk);
-      },
-    }),
-  );
-}
-
 /**
  * @returns {Headers}
  */
 function corsHeaders() {
   return new Headers({
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, HEAD, OPTIONS",
-    "Access-Control-Allow-Headers": "X-API-Key, Authorization, Content-Type",
+    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "X-API-Key, Content-Type",
     "Access-Control-Max-Age": "86400",
   });
 }

@@ -50,8 +50,12 @@ export interface QueueItem {
   /** 转换输出路径（与 inputPath 同目录 .webp） */
   outputPath: string;
   failed?: boolean;
-  /** 失败发生的阶段：转换（WebP）或上传（Worker），用于区分失败标签 */
+  /** 失败发生的阶段：转换（WebP/WebM）或上传（Worker），用于区分失败标签 */
   failStage?: "convert" | "upload";
+  /** 仅压缩模式：不上传、不进图库 */
+  localOnly?: boolean;
+  /** 视频（mp4 → webm） */
+  isVideo?: boolean;
 }
 
 export type ViewName = "gallery" | "upload" | "settings" | "deploy";

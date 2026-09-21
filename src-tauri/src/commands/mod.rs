@@ -19,17 +19,48 @@ pub fn get_config(state: tauri::State<'_, ConfigState>) -> Result<config::Config
 }
 
 /// 将图片转换为 WebP（减小体积）：输入为本地文件路径，quality 1-100（可选，默认 80）。
-/// 输出写入系统临时目录，返回 (输入大小, 输出大小, 输出路径)。
+/// output_dir 为空时写入系统临时目录；否则直接写到该目录（仅压缩模式）。
+/// 返回 (输入大小, 输出大小, 输出路径)。
 /// async + spawn_blocking：图片解码/编码是 CPU 密集任务，不能占 Tauri 主线程，否则拖拽/点击会卡顿。
 #[tauri::command]
-pub async fn convert_to_webp(input: String, quality: Option<f32>) -> Result<(u64, u64, String), AppError> {
+pub async fn convert_to_webp(
+    input: String,
+    quality: Option<f32>,
+    output_dir: Option<String>,
+) -> Result<(u64, u64, String), AppError> {
     let quality = quality.unwrap_or(80.0);
     tauri::async_runtime::spawn_blocking(move || {
-        let (in_size, out_size, out_path) = compress::convert_to_webp(&PathBuf::from(input), quality)?;
+        let out_dir = output_dir.map(PathBuf::from);
+        let (in_size, out_size, out_path) = compress::convert_to_webp(
+            &PathBuf::from(input),
+            quality,
+            out_dir.as_deref(),
+        )?;
         Ok((in_size, out_size, out_path.to_string_lossy().into_owned()))
     })
     .await
     .map_err(|e| AppError::Io(format!("转换任务失败: {e}")))?
+}
+
+/// 将视频压缩为 WebM（系统 ffmpeg）：输出写入用户选择的 output_dir。
+/// 返回 (输入大小, 输出大小, 输出路径)。
+#[tauri::command]
+pub async fn compress_video_to_webm(
+    input: String,
+    quality: Option<f32>,
+    output_dir: String,
+) -> Result<(u64, u64, String), AppError> {
+    let quality = quality.unwrap_or(80.0);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (in_size, out_size, out_path) = compress::compress_video_to_webm(
+            &PathBuf::from(input),
+            quality,
+            &PathBuf::from(output_dir),
+        )?;
+        Ok((in_size, out_size, out_path.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(|e| AppError::Io(format!("视频压缩任务失败: {e}")))?
 }
 
 /// 保存 Worker 连接配置（server / apiKey）到 config.json；设置页保存时调用。
@@ -129,6 +160,76 @@ pub fn delete_thumbnail(app: tauri::AppHandle, key: String) -> Result<(), AppErr
         .map_err(|e| AppError::Io(format!("解析缓存目录失败: {e}")))?
         .join("thumbs");
     thumbnail::remove(&dir, &key)
+}
+
+/// 在系统文件管理器中打开并定位到该文件（「打开位置」）。
+#[tauri::command]
+pub fn open_folder(path: String) -> Result<(), AppError> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err(AppError::Io(format!("路径不存在: {path}")));
+    }
+
+    // spawn 即返回；explorer 即使成功也可能以非 0 退出，不要用 wait()/output() 判失败
+    #[cfg(target_os = "windows")]
+    {
+        // /select, 打开资源管理器并选中该文件
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", p.to_string_lossy()))
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开文件夹失败: {e}")))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &p.to_string_lossy()])
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开文件夹失败: {e}")))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let dir = if p.is_dir() {
+            p.clone()
+        } else {
+            p.parent().map(|d| d.to_path_buf()).unwrap_or_else(|| p.clone())
+        };
+        std::process::Command::new("xdg-open")
+            .arg(dir)
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开文件夹失败: {e}")))?;
+    }
+    Ok(())
+}
+
+/// 用系统默认浏览器打开 http(s) 链接（侧边栏 GitHub 等）。
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), AppError> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err(AppError::Io("仅支持 http/https 链接".into()));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &url])
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开链接失败: {e}")))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开链接失败: {e}")))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&url)
+            .spawn()
+            .map_err(|e| AppError::Io(format!("打开链接失败: {e}")))?;
+    }
+    Ok(())
 }
 
 /// 导出设置备份：将设置 JSON 写入用户选择的文件（设置页「导出备份」）

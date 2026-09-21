@@ -18,6 +18,9 @@
   --color-accent: #2563eb;
   --color-accent-strong: #1d4ed8;
   --color-accent-soft: #e8effc;
+  /* 分段选择器蓝色指示器：accent-soft 与轨道 surface2 对比度仅 1.01（近乎隐形），
+     指示器单独用这枚加深过的同色相蓝（对比度 ≈1.3），保证滑动过程可见 */
+  --color-seg-thumb: #c3d3f2;
   --color-danger: #dc2626;
   --color-danger-strong: #b91c1c;
   --color-danger-soft: #fdecec;
@@ -44,6 +47,7 @@
     --color-accent: #7aa7ff;
     --color-accent-strong: #1d4ed8;
     --color-accent-soft: rgb(37 99 235 / 20%);
+    --color-seg-thumb: rgb(37 99 235 / 26%);
     --color-danger: #f87171;
     --color-danger-strong: #b91c1c;
     --color-danger-soft: rgb(220 38 38 / 16%);
@@ -68,6 +72,7 @@
   --color-accent: #7aa7ff;
   --color-accent-strong: #1d4ed8;
   --color-accent-soft: rgb(37 99 235 / 20%);
+  --color-seg-thumb: rgb(37 99 235 / 26%);
   --color-danger: #f87171;
   --color-danger-strong: #b91c1c;
   --color-danger-soft: rgb(220 38 38 / 16%);
@@ -91,6 +96,9 @@
   --color-accent: #2563eb;
   --color-accent-strong: #1d4ed8;
   --color-accent-soft: #e8effc;
+  /* 分段选择器蓝色指示器：accent-soft 与轨道 surface2 对比度仅 1.01（近乎隐形），
+     指示器单独用这枚加深过的同色相蓝（对比度 ≈1.3），保证滑动过程可见 */
+  --color-seg-thumb: #c3d3f2;
   --color-danger: #dc2626;
   --color-danger-strong: #b91c1c;
   --color-danger-soft: #fdecec;
@@ -133,123 +141,6 @@
 }
 .sidebar-collapsed .brand {
   justify-content: center;
-}
-
-/* Chrome 式标签条（sidebar.md 框架）：激活标签与内容面板同底色，合并为一个「面板」。
-   标签图标 / 关闭图标统一收小（图标源尺寸 16-19px） */
-.tab-ic svg {
-  width: 15px;
-  height: 15px;
-}
-.tab-close {
-  opacity: 0;
-}
-.tab:hover .tab-close,
-.tab[aria-selected="true"] .tab-close {
-  opacity: 1;
-}
-.tab-close svg {
-  width: 12px;
-  height: 12px;
-}
-/* 标签横排溢出时隐藏滚动条（标签本身可横向滚动） */
-.tablist::-webkit-scrollbar {
-  display: none;
-}
-
-/* 标签条：无水平内边距，让指示条可以延伸到内容区左边缘 */
-.tab-strip {
-  padding-left: 0;
-  padding-right: 0;
-  border-bottom: 1px solid transparent;
-}
-
-/* 标签指示条 = 内容面板同色「纸面」，向下延伸覆盖内容面板顶部圆角区域，
-   与面板共享左侧边框，形成连续轮廓。底部 padding 让指示条背景延伸到面板顶部，
-   覆盖面板的左上圆角；面板的 border-top 被移除以避免重叠边框。 */
-.tab-active-bg {
-  position: absolute;
-  top: 0;
-  bottom: -4px;           /* 向下延伸，覆盖面板顶部圆角 + 1px border 区域 */
-  left: -12px;            /* 对齐内容面板左边缘（tablist px-3 偏移量） */
-  width: 0;
-  border-radius: 12px 12px 0 0;
-  border-left: 1px solid var(--color-line);
-  border-right: 1px solid var(--color-line);
-  background: var(--color-canvas);
-  pointer-events: none;
-}
-/* 粘合动画：离开时拉伸 + 吸附时压缩 */
-@keyframes tab-sticky-leave {
-  0%   { transform: scaleX(1) scaleY(1); }
-  40%  { transform: scaleX(0.92) scaleY(1.15); }
-  100% { transform: scaleX(1) scaleY(1); }
-}
-/* 贴合并排：非激活标签之间用 1px 分隔线划分；末尾或紧邻激活标签（右侧）时不画，
-   保证激活「纸面」与相邻标签之间无竖线（对齐文档 ChromeTab 分隔逻辑） */
-.tablist .tab:not([aria-selected="true"])::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  width: 1px;
-  height: 16px;
-  translate: 0 -50%;
-  background: var(--color-line);
-  pointer-events: none;
-}
-.tablist .tab:not([aria-selected="true"]):last-child::after,
-.tablist .tab:not([aria-selected="true"]):has(+ .tab[aria-selected="true"])::after {
-  content: none;
-}
-
-/* 右键上下文菜单（文档 ContextMenu）：body 级 fixed 浮层 */
-.ctx-root {
-  position: fixed;
-  z-index: 40;
-  min-width: 176px;
-  padding: 4px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-modal);
-  animation: ctx-in 120ms ease-out;
-}
-@keyframes ctx-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
-}
-.ctx-item {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--color-ink);
-  text-align: left;
-}
-.ctx-item:not(:disabled) {
-  cursor: pointer;
-}
-.ctx-item:not(:disabled):hover {
-  background: var(--color-surface3);
-}
-.ctx-item:disabled {
-  opacity: 0.45;
-}
-.ctx-ic {
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.ctx-ic svg {
-  width: 14px;
-  height: 14px;
-}
-.ctx-ic.flip svg {
-  transform: scaleX(-1); /* 「关闭左侧」用右箭头镜像 */
 }
 
 /* 删除确认态：遮罩保持显示（DESIGN-SPEC §3.3） */
@@ -412,6 +303,19 @@
 @keyframes modal-panel-out {
   from { opacity: 1; transform: none; }
   to   { opacity: 0; transform: scale(0.97) translateY(4px); }
+}
+
+/* 分段选择器统一的蓝色指示器（seg.ts 的 SEG_THUMB_CLASS="seg-thumb-blue"，
+   主题切换 / 命名方式 / 链接格式 / 压缩模式四处共用，配色与滑动动画都一致）。
+   浅色主题下若直接用 accent-soft(#e8effc)：它与轨道 surface2(#eef0f3) 的对比度只有 1.01，
+   指示器等于隐形（滑动过程"看不出在动"），故单独给一枚加深过的同色相蓝 --color-seg-thumb
+   （对比度 ≈1.3，边界看得清），再叠一层蓝色投影把它从轨道上托起来。 */
+.seg-thumb-blue {
+  background: var(--color-seg-thumb);
+  box-shadow:
+    0 0 0 1px rgb(37 99 235 / 12%),
+    0 1px 2px rgb(37 99 235 / 18%),
+    0 2px 6px -2px rgb(37 99 235 / 22%);
 }
 
 /* 刻度滑块（elasticSlider.ts）：shadcn 风格外观（8px 轨道 + 数值气泡 + 刻度） */

@@ -45,10 +45,11 @@ export const errorMessage = (e: unknown): string => {
   return String(e);
 };
 
-export const nowDate = (): string => {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-};
+/** Date → "YYYY-MM-DD HH:mm"（本地时区）；上传列表与云端列表共用 */
+export const formatDateTime = (d: Date): string =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+export const nowDate = (): string => formatDateTime(new Date());
 
 /** API Key 固定前缀：`as` = 产品标识（Assets Studio），`live` = 环境。
  * 体现产品身份而非个人身份（WORKER-V2.md §2 决策 7），未来可扩展 as_test_ / as_dev_。
@@ -73,13 +74,14 @@ export const generateApiKey = (): string => {
   return API_KEY_PREFIX + segments.join("-");
 };
 
-/** 读取图片真实尺寸（上传预览用） */
-export const readDims = (url: string, cb: (w: number | null, h: number | null) => void): void => {
-  const img = new Image();
-  img.onload = () => cb(img.naturalWidth, img.naturalHeight);
-  img.onerror = () => cb(null, null);
-  img.src = url;
-};
+/** 读取图片真实尺寸（上传预览用）；失败时宽高为 null */
+export const readDims = (url: string): Promise<{ w: number | null; h: number | null }> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => resolve({ w: null, h: null });
+    img.src = url;
+  });
 
 /** 底部轻提示（单例；浅色深底 / 深色浅底由 CSS 变量自动反转） */
 let toastEl: HTMLElement | null = null;

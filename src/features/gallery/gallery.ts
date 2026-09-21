@@ -1,8 +1,8 @@
 import type { ImageItem } from "../../lib/types";
-import { Channel, convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { esc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 import { copyLink, removeItem } from "../../lib/store";
+import { fetchThumbnails, thumbSrc } from "../../lib/thumbs";
 import { groupByPeriod, type PeriodGroup } from "./periods";
 
 interface GalleryCallbacks {
@@ -170,17 +170,9 @@ function onTimelineClick(e: MouseEvent, cb: GalleryCallbacks): void {
   onCardClick(e, cb);
 }
 
-/** get_thumbnails 命令经 Channel 单条回传的结果：path 为本地缩略图路径，空串表示生成失败 */
-interface ThumbRes {
-  key: string;
-  path: string;
-}
-
 /**
  * 为展开节点的可见卡片填充缩略图：卡片渲染时不带 src（避免直接加载原图），
- * 批量请求 Rust 本地缩略图缓存（命中磁盘路径 / 未命中下载生成）。
- * 结果经 Channel 逐条回传——每完成一张立即上屏，慢图不阻塞已就绪的图；
- * 单条失败（path 空）回退公开 URL，整批调用失败也回退。
+ * 批量请求 Rust 本地缩略图缓存。结果经 Channel 逐条回传；失败回退公开 URL。
  * 重绘会替换 DOM，回传时只处理仍在文档中的 img，避免旧节点被误写。
  */
 function hydrateThumbs(tl: HTMLElement): void {
@@ -197,16 +189,17 @@ function hydrateThumbs(tl: HTMLElement): void {
   const apply = (key: string, path: string): void => {
     for (const img of byKey.get(key) ?? []) {
       if (!img.isConnected) continue;
-      img.src = path ? convertFileSrc(path) : img.dataset.url || "";
+      img.src = path ? thumbSrc(path) : img.dataset.url || "";
     }
   };
-  invoke("get_thumbnails", {
-    items: reqs,
-    onMessage: new Channel<ThumbRes>((res) => apply(res.key, res.path)),
-  }).catch((e) => {
-    console.error("[gallery] 缩略图批量获取失败，回退原图 URL:", e);
-    for (const key of byKey.keys()) apply(key, "");
-  });
+  fetchThumbnails(
+    reqs,
+    (res) => apply(res.key, res.path),
+    (e) => {
+      console.error("[gallery] 缩略图批量获取失败，回退原图 URL:", e);
+      for (const key of byKey.keys()) apply(key, "");
+    },
+  );
 }
 
 /**

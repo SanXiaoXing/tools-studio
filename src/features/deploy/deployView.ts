@@ -7,10 +7,10 @@
 import workerSource from "../../../apps/worker/src/index.js?raw";
 import { icon } from "../../lib/icons";
 import { copyText, esc, feedbackCheck, showToast } from "../../lib/utils";
+import { CODE_CLS, SCROLL_BODY_CLS } from "../../lib/ui-classes";
 
 const COPY_BTN_CLS =
   "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 border border-line bg-surface text-ink2 text-xs font-medium hover:bg-surface3 hover:text-ink transition";
-const CODE_CLS = "font-mono text-[11px] bg-surface3 border border-line rounded px-1.5 py-0.5 text-ink2";
 const PRE_CLS = "whitespace-pre font-mono text-[11.5px] leading-relaxed text-ink overflow-auto";
 
 /** 步骤项：序号圆点 + 文案（含行内 code 片段） */
@@ -39,7 +39,7 @@ export function renderDeployView(
   opts?: { onBack?: () => void },
 ): void {
   container.innerHTML = `
-  <div class="settings-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-5">
+  <div class="${SCROLL_BODY_CLS}">
     <div class="flex items-center">
       <button id="backToSettings" type="button" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 border border-line bg-surface text-ink2 text-xs font-medium hover:bg-surface3 hover:text-ink transition">
         ${icon.arrow} 返回设置

@@ -1,15 +1,25 @@
 import { basename, esc } from "../../lib/utils";
 import { icon } from "../../lib/icons";
 
-/** 上传二次确认弹窗（vanilla 版）：列出待上传文件（可逐个移除），确认后才真正入队。
+/** 处理模式：压缩并上传 / 仅压缩（不上传，输出到本地目录） */
+export type ProcessMode = "upload" | "compress-only";
+
+/** 二次确认弹窗（vanilla）：列出待处理文件（可逐个移除），确认后才真正入队。
  *  显隐与回调由调用方（upload.ts）控制；移除状态由内部维护。 */
 export function showConfirmUpload(
   paths: string[],
   onConfirm: (paths: string[]) => void,
   onCancel: () => void,
+  mode: ProcessMode = "upload",
 ): void {
   let pending = [...paths];
   const MAX_SHOW = 100;
+  const local = mode === "compress-only";
+  const title = local ? "确认压缩" : "确认上传";
+  const desc = local
+    ? `将压缩到你选择的本地文件夹（图片→WebP，视频→WebM），共 <span class="text-ink font-semibold tnum">${pending.length}</span> 个文件，请确认：`
+    : `将转换为 WebP 后上传，共 <span class="text-ink font-semibold tnum">${pending.length}</span> 张图片，请确认：`;
+  const confirmLabel = local ? "确认压缩" : "确认上传";
 
   const wrap = document.createElement("div");
   wrap.className = "fixed inset-0 z-40 flex items-center justify-center p-6 bg-[rgba(9,12,18,.55)] backdrop-blur-sm";
@@ -26,12 +36,10 @@ export function showConfirmUpload(
     wrap.innerHTML = `
     <div class="w-full max-w-[420px] max-h-[80dvh] flex flex-col bg-surface border border-line rounded-2xl shadow-modal overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
       <div class="flex items-center justify-between px-5 py-4 border-b border-line">
-        <h2 id="confirmTitle" class="text-[15px] font-bold">确认上传</h2>
+        <h2 id="confirmTitle" class="text-[15px] font-bold">${title}</h2>
         <button type="button" data-act="cancel" class="flex items-center justify-center w-[30px] h-[30px] rounded-lg border border-line bg-surface text-ink2 hover:bg-surface3 hover:text-ink transition" title="取消" aria-label="取消">${icon.x}</button>
       </div>
-      <p class="px-5 pt-3.5 text-[13px] text-ink3 leading-relaxed">
-        将转换为 WebP 后上传，共 <span class="text-ink font-semibold tnum">${pending.length}</span> 张图片，请确认：
-      </p>
+      <p class="px-5 pt-3.5 text-[13px] text-ink3 leading-relaxed">${desc}</p>
       <ul class="confirm-list flex-1 min-h-0 mx-5 mt-3 mb-4 overflow-y-auto flex flex-col gap-1">
         ${shown
           .map(
@@ -43,11 +51,11 @@ export function showConfirmUpload(
         </li>`,
           )
           .join("")}
-        ${extra > 0 ? `<li class="px-2.5 py-1.5 text-xs text-ink3">… 还有 ${extra} 张未显示</li>` : ""}
+        ${extra > 0 ? `<li class="px-2.5 py-1.5 text-xs text-ink3">… 还有 ${extra} 个未显示</li>` : ""}
       </ul>
       <div class="flex gap-2.5 px-5 py-4 border-t border-line">
         <button type="button" data-act="cancel" class="flex-1 rounded-lg px-4.5 py-2.5 border border-line bg-surface text-ink2 text-sm font-medium hover:bg-surface3 hover:text-ink transition">取消</button>
-        <button type="button" data-act="confirm" class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-4.5 py-2.5 bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition">${icon.upload}确认上传</button>
+        <button type="button" data-act="confirm" class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-4.5 py-2.5 bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition">${icon.upload}${confirmLabel}</button>
       </div>
     </div>`;
   };
