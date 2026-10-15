@@ -30,6 +30,7 @@ export function renderUploadView(container: HTMLElement): UploadApi {
   let done = 0;
   let mode: ProcessMode = "upload";
   let outputDir = "";
+  let newestFirst = true;
 
   container.innerHTML = `
   <div class="upload-body flex-1 min-h-0 overflow-y-auto p-5 pl-9 pr-9 pb-12 flex flex-col gap-4">
@@ -42,7 +43,11 @@ export function renderUploadView(container: HTMLElement): UploadApi {
     </div>
     <div class="queue flex flex-col max-h-[55dvh] bg-surface border border-line rounded-xl shadow-card overflow-hidden" hidden>
       <div class="flex items-center justify-between px-4.5 py-3.5 text-[13px] font-semibold border-b border-line shrink-0">
-        <span class="q-title">上传队列</span><span class="q-count text-xs font-medium text-ink3 tnum"></span>
+        <span class="q-title">上传队列</span>
+        <div class="flex items-center gap-2">
+          <span class="q-count text-xs font-medium text-ink3 tnum"></span>
+          <button class="q-sort inline-flex items-center justify-center w-8 h-8 rounded-md border border-line bg-surface text-ink2 hover:border-accent hover:text-accent active:bg-surface3 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2 transition-colors" type="button"></button>
+        </div>
       </div>
       <div class="q-list overflow-y-auto min-h-0"></div>
     </div>
@@ -56,6 +61,7 @@ export function renderUploadView(container: HTMLElement): UploadApi {
   const dropDesc = container.querySelector<HTMLElement>(".drop-desc")!;
   const dropBtn = container.querySelector<HTMLElement>(".drop-btn")!;
   const qTitle = container.querySelector<HTMLElement>(".q-title")!;
+  const sortBtn = container.querySelector<HTMLButtonElement>(".q-sort")!;
 
   const applyModeUI = (): void => {
     const local = mode === "compress-only";
@@ -85,10 +91,27 @@ export function renderUploadView(container: HTMLElement): UploadApi {
   applyModeUI();
 
   const renderQueue = (): void => {
-    queueList.innerHTML = queue.map((q, i) => queueRowHTML(q, i, mode)).join("");
+    // 保留原队列下标：进度更新和行按钮仍指向同一任务，处理顺序不受显示排序影响。
+    const rows = queue.map((q, i) => queueRowHTML(q, i, mode));
+    queueList.innerHTML = (newestFirst ? rows.reverse() : rows).join("");
     countEl.textContent = `${done} / ${total} 已完成`;
     queueEl.hidden = queue.length === 0;
   };
+
+  const updateSortButton = (): void => {
+    sortBtn.innerHTML = newestFirst ? icon.sortDesc : icon.sortAsc;
+    sortBtn.title = newestFirst
+      ? "当前倒序（新加入的在前），点击切换正序"
+      : "当前正序（先加入的在前），点击切换倒序";
+    sortBtn.setAttribute("aria-label", sortBtn.title);
+  };
+  updateSortButton();
+  sortBtn.addEventListener("click", () => {
+    newestFirst = !newestFirst;
+    updateSortButton();
+    renderQueue();
+    queueList.scrollTop = 0;
+  });
 
   const updateRow = (q: QueueItem): void => {
     const row = queueList.querySelector<HTMLElement>(`[data-i="${queue.indexOf(q)}"]`);
@@ -258,6 +281,8 @@ export function renderUploadView(container: HTMLElement): UploadApi {
       total += 1;
     }
     renderQueue();
+    // 追加上传后定位新任务；完成/失败重绘时不打断用户正在查看的位置。
+    queueList.scrollTop = newestFirst ? 0 : queueList.scrollHeight;
     processNext();
   };
 
