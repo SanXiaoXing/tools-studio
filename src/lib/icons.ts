@@ -17,6 +17,8 @@ const PATHS = {
   sortDesc: '<path d="M8 4v16M4 16l4 4 4-4M14 6h7M14 12h5M14 18h3"/>',
   github: '<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>',
   folder: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>',
+  file: '<path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M14 2v6h5M8 13h8M8 17h6"/>',
+  qr: '<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>',
 } as const;
 
 const svg = (paths: string, size = 18): string =>
@@ -41,4 +43,6 @@ export const icon = {
   sortDesc: svg(PATHS.sortDesc, 17),
   github: svg(PATHS.github, 17),
   folder: svg(PATHS.folder, 14),
+  file: svg(PATHS.file, 20),
+  qr: svg(PATHS.qr, 20),
 } as const;

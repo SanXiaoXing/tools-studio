@@ -17,6 +17,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { renderElasticSlider } from "./elasticSlider";
+import { serializeConfigExport, showConfigQrDialog } from "./configExport";
 
 /** API Key 只读态打码：8 个圆点 + 尾号 4 位（DESIGN-SPEC §3.4） */
 const maskKey = (v: string): string => (v ? "•".repeat(8) + v.slice(-4) : "未设置");
@@ -218,11 +219,21 @@ export function renderSettingsView(
       </section>
 
       <section class="bg-surface border border-line rounded-xl shadow-card p-5">
-        <h2 class="text-[15px] font-bold mb-1">备份与恢复</h2>
-        <p class="text-xs text-ink3 leading-relaxed mb-4.5">导出全部设置（含 Worker 地址、API Key、域名）为 JSON 文件，或从备份文件一键恢复。</p>
-        <div class="flex items-center gap-2.5">
-          <button id="exportBackup" class="inline-flex items-center gap-2 rounded-lg px-4.5 py-2.5 bg-accent-strong text-white text-sm font-semibold hover:bg-accent active:scale-[.985] transition" type="button">导出备份</button>
-          <button id="importBackup" class="inline-flex items-center gap-2 rounded-lg px-4.5 py-2.5 border border-line bg-surface text-ink2 text-sm font-medium hover:bg-surface3 hover:text-ink transition" type="button">导入备份</button>
+        <h2 class="text-[15px] font-bold mb-1">配置迁移</h2>
+        <p class="text-[13px] text-ink2 leading-relaxed mb-4">将当前设置带到其他设备。</p>
+        <div class="grid grid-cols-1 min-[980px]:grid-cols-2 gap-3">
+          <button id="exportBackup" class="config-transfer-option flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3.5 text-left" type="button">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-surface2 text-accent">${icon.file}</span>
+            <span class="min-w-0"><span class="block text-[13px] font-semibold text-ink">导出配置文件</span><span class="mt-0.5 block text-xs leading-relaxed text-ink3">保存 JSON 文件，可在桌面端导入</span></span>
+          </button>
+          <button id="exportQr" class="config-transfer-option flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3.5 text-left" type="button">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-accent-soft text-accent">${icon.qr}</span>
+            <span class="min-w-0"><span class="block text-[13px] font-semibold text-ink">显示配置二维码</span><span class="mt-0.5 block text-xs leading-relaxed text-ink3">供后续移动端扫描导入</span></span>
+          </button>
+        </div>
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3.5">
+          <p class="m-0 text-xs leading-relaxed text-ink3">导出内容包含 API Key，请妥善保管。</p>
+          <button id="importBackup" class="inline-flex items-center rounded-lg px-2.5 py-2 text-[13px] font-medium text-accent hover:bg-accent-soft" type="button">导入已有配置 ${icon.arrow}</button>
         </div>
       </section>
 
@@ -434,7 +445,10 @@ export function renderSettingsView(
 
   /** 备份与恢复：导出当前设置为 JSON 文件，从备份文件一键恢复（含一次性设置） */
   const exportBtn = $<HTMLButtonElement>("#exportBackup");
+  const exportQrBtn = $<HTMLButtonElement>("#exportQr");
   const importBtn = $<HTMLButtonElement>("#importBackup");
+
+  const exportPayload = (compact = false): string => serializeConfigExport(getSettings(), conn, compact);
 
   exportBtn.addEventListener("click", () => {
     void save({
@@ -444,14 +458,17 @@ export function renderSettingsView(
     }).then(async (path) => {
       if (!path) return;
       try {
-        // 备份含完整设置：连接信息（Rust config.json）与本地展示设置合并导出
-        const backup = JSON.stringify({ ...getSettings(), server: conn.server, apiKey: conn.apiKey }, null, 2);
+        const backup = exportPayload();
         await invoke("export_settings", { path, content: backup });
         showToast("备份已导出");
       } catch (e) {
         showToast(`导出失败：${errorMessage(e)}`);
       }
     });
+  });
+
+  exportQrBtn.addEventListener("click", () => {
+    showConfigQrDialog(exportPayload(true), exportQrBtn);
   });
 
   importBtn.addEventListener("click", () => {

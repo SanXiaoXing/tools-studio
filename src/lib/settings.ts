@@ -60,8 +60,15 @@ export const updateSettings = (patch: Partial<Settings>): void => {
 /** 解析备份 JSON 为完整设置；结构非法时返回 null（备份导入用，未知字段丢弃） */
 export const parseSettingsBackup = (raw: string): Settings | null => {
   try {
-    const data = JSON.parse(raw) as Partial<Settings>;
-    if (!data || typeof data !== "object") return null;
+    const root = JSON.parse(raw) as Record<string, unknown>;
+    if (!root || typeof root !== "object" || Array.isArray(root)) return null;
+    let source: unknown = root;
+    if (root.appId !== undefined || root.formatVersion !== undefined) {
+      if (root.appId !== "assets-studio" || root.formatVersion !== 1) return null;
+      source = root.settings;
+    }
+    if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+    const data = source as Partial<Settings>;
     const merged: Settings = { ...SETTINGS_DEFAULTS, ...data };
     if (typeof merged.domain !== "string") return null;
     if (typeof merged.pathTemplate !== "string") return null;
@@ -80,7 +87,11 @@ export const parseSettingsBackup = (raw: string): Settings | null => {
  *  旧版备份未含这些字段时返回 null。 */
 export const parseConnectionBackup = (raw: string): { server: string; apiKey: string } | null => {
   try {
-    const data = JSON.parse(raw) as Record<string, unknown>;
+    const root = JSON.parse(raw) as Record<string, unknown>;
+    const data = root.appId === "assets-studio" && root.formatVersion === 1
+      ? root.connection as Record<string, unknown>
+      : root;
+    if (!data || typeof data !== "object") return null;
     if (typeof data.server !== "string" || typeof data.apiKey !== "string") return null;
     return { server: data.server, apiKey: data.apiKey };
   } catch {

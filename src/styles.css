@@ -112,6 +112,64 @@
 /* [hidden] 优先级修复（DESIGN-SPEC §8.1）：防止 display 工具类覆盖 hidden 属性 */
 [hidden] { display: none !important; }
 
+body { font-optical-sizing: auto; }
+
+:where(button, a):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 配置迁移操作：让整个选项成为清晰的点击目标，按下时立即反馈。 */
+.config-transfer-option {
+  transition: background-color 160ms ease, border-color 160ms ease, transform 100ms ease-out;
+}
+.config-transfer-option:hover {
+  background: var(--color-surface3);
+  border-color: var(--color-accent);
+}
+.config-transfer-option:active,
+.config-qr-dialog button:active {
+  transform: scale(0.985);
+}
+.config-qr-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  transform-origin: top left;
+}
+.config-qr-dialog::backdrop {
+  background: var(--color-overlay);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: config-qr-backdrop-in 220ms ease-out both;
+}
+.config-qr-dialog.is-closing::backdrop {
+  animation: config-qr-backdrop-out 250ms ease-in both;
+}
+@keyframes config-qr-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes config-qr-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .config-qr-dialog::backdrop {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .config-transfer-option:hover,
+  .config-transfer-option:focus-visible,
+  .config-qr-dialog {
+    border-color: var(--color-ink);
+  }
+}
+
 /* 侧边栏折叠宽度动画：显式非分层规则。
    文件顶部非分层的 * 声明了仅颜色类的 transition-property（@layer utilities 内的
    transition-[width] 会被其覆盖），width 需在这里单独声明才会真正过渡。 */
@@ -402,5 +460,9 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+  .config-transfer-option:active,
+  .config-qr-dialog button:active {
+    transform: none;
   }
 }

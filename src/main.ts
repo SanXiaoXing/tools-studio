@@ -30,9 +30,11 @@ app.className = "flex h-full";
 
 /** 视图页头（DESIGN-SPEC §2） */
 const headerHTML = (title: string, sub: string): string => `
-  <header class="flex items-baseline gap-3 px-9 pt-6.5 pb-1 shrink-0">
-    <h1 class="m-0 text-[22px] font-bold tracking-tight">${title}</h1>
-    <p class="m-0 text-[13px] text-ink3">${sub}</p>
+  <header class="view-header flex items-start gap-3 px-9 pt-6 pb-4 shrink-0">
+    <div class="min-w-0 flex-1">
+      <h1 class="m-0 text-[23px] leading-tight font-bold tracking-[-0.02em]">${title}</h1>
+      <p class="m-0 mt-1 text-[13px] leading-relaxed text-ink3">${sub}</p>
+    </div>
   </header>`;
 
 const VIEW_BASE = "flex-1 min-h-0 flex flex-col overflow-hidden";
